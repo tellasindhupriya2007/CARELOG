@@ -1,0 +1,249 @@
+/* Import Inter font */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+/* Reset */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+html,
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #F8FAFC;
+  width: 100%;
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* =======================================
+   MOBILE-FIRST ROOT
+   ======================================= */
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background-color: #F8FAFC;
+  /* Mobile: constrain to phone width centered */
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.07);
+}
+
+/* =======================================
+   MOBILE ONLY — hidden on desktop
+   ======================================= */
+.mobile-only {
+  display: block;
+}
+
+/* =======================================
+   DESKTOP ONLY — hidden on mobile
+   ======================================= */
+.desktop-only {
+  display: none !important;
+}
+
+.desktop-flex {
+  display: none !important;
+}
+
+/* =======================================
+   DESKTOP BREAKPOINT ≥ 768px
+   ======================================= */
+@media (min-width: 768px) {
+
+  /* Reset root constraints for desktop — full width */
+  #root {
+    max-width: 100%;
+    margin: 0;
+    box-shadow: none;
+    background-color: #F8FAFC;
+  }
+
+  /* Toggle visibility classes */
+  .mobile-only {
+    display: none !important;
+  }
+
+  .desktop-only {
+    display: block !important;
+  }
+
+  .desktop-flex {
+    display: flex !important;
+  }
+
+  /* ─── SIDEBAR ─────────────────────────── */
+  .sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+    background: #ffffff;
+    border-right: 1px solid #E5E7EB;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    padding: 32px 16px;
+    flex-shrink: 0;
+  }
+
+  /* ─── DESKTOP LAYOUT SHELL ────────────── */
+  .desktop-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100%;
+    min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #F8FAFC;
+  }
+
+  /* The main scrollable content area beside sidebar */
+  .desktop-content {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 32px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* ─── AUTH SCREENS CENTRED CARD ─────── */
+  .auth-desktop-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important;
+    background: #F8FAFC !important;
+  }
+
+  .auth-desktop-card {
+    width: 480px !important;
+    min-height: auto !important;
+    background: #ffffff !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.10) !important;
+    border-radius: 16px !important;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+
+  /* ─── CARETAKER GRID: 60/40 ──────────── */
+  .caretaker-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 32px !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+  }
+
+  .caretaker-grid>div:first-child {
+    flex: 0 0 58% !important;
+    max-width: 58% !important;
+  }
+
+  .caretaker-grid>div:last-child {
+    flex: 0 0 38% !important;
+    max-width: 38% !important;
+    position: sticky;
+    top: 0;
+  }
+
+  /* ─── FAMILY GRID: 30/40/30 ─────────── */
+  .family-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 24px !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+  }
+
+  .family-grid>div:nth-child(1) {
+    flex: 0 0 28% !important;
+  }
+
+  .family-grid>div:nth-child(2) {
+    flex: 1 !important;
+  }
+
+  .family-grid>div:nth-child(3) {
+    flex: 0 0 28% !important;
+  }
+
+  /* ─── DOCTOR GRID: 35/65 ────────────── */
+  .doctor-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 24px !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+  }
+
+  .doctor-grid>div:first-child {
+    flex: 0 0 34% !important;
+    max-width: 34% !important;
+  }
+
+  .doctor-grid>div:last-child {
+    flex: 1 !important;
+  }
+
+  /* ─── PDF LAYOUT ────────────────────── */
+  .pdf-desktop {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .pdf-two-col {
+    display: flex !important;
+    gap: 24px;
+    width: 100%;
+  }
+
+  .pdf-two-col>div {
+    flex: 1;
+  }
+}
+
+/* =======================================
+   GLOBAL UI
+   ======================================= */
+
+/* PWA tap targets */
+button {
+  min-height: 44px;
+}
+
+/* Sidebar hidden by default on mobile */
+.sidebar {
+  display: none;
+}
+
+/* Subtle overlay on desktop behind auth cards */
+@media (min-width: 768px) {
+  body {
+    background-color: #EFF4FB;
+  }
+}
