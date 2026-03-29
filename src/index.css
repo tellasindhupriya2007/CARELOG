@@ -1,31 +1,55 @@
+/* ========================================
+   CARELOG — COMPREHENSIVE RESPONSIVE CSS
+   Mobile-first, then desktop override
+   ======================================== */
+
 /* Import Inter font */
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
 
-/* Reset */
+/* ───── CSS CUSTOM PROPERTIES ───── */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+
+  --header-h: 56px;
+  --bottom-nav-h: 64px;
+  --sidebar-w: 240px;
+
+  --color-bg: #F8FAFC;
+  --color-white: #ffffff;
+  --color-border: #E5E7EB;
+  --color-blue: #2D6BE4;
+  --color-text: #1A1A2E;
+  --color-text2: #6B7280;
+
+  font-size: 14px;
+  /* mobile base — 1rem = 14px */
+}
+
+/* ───── GLOBAL RESET ───── */
 *,
 *::before,
 *::after {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-*::-webkit-scrollbar {
-  display: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: #F8FAFC;
   width: 100%;
   height: 100%;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  background-color: var(--color-bg);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   scroll-behavior: smooth;
 }
 
@@ -34,32 +58,73 @@ body {
   flex-direction: column;
 }
 
-/* =======================================
-   MOBILE-FIRST ROOT
-   ======================================= */
+/* Hide scrollbars for app feel */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ───── GLOBAL OVERFLOW + TEXT ───── */
+img,
+svg,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+p,
+span,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ───── INPUT ZOOM PREVENTION ───── */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+  /* Prevents iOS zoom on focus */
+  touch-action: manipulation;
+}
+
+/* ───── TOUCH TARGETS ───── */
+button,
+a,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ───── ROOT CONTAINER — MOBILE BASE ───── */
 #root {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  background-color: #F8FAFC;
-  /* Mobile: constrain to phone width centered */
   max-width: 430px;
   margin: 0 auto;
   position: relative;
+  background-color: var(--color-bg);
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.07);
+  overflow-x: hidden;
 }
 
-/* =======================================
-   MOBILE ONLY — hidden on desktop
-   ======================================= */
+/* ───── MOBILE VISIBILITY CLASSES ───── */
 .mobile-only {
   display: block;
 }
 
-/* =======================================
-   DESKTOP ONLY — hidden on mobile
-   ======================================= */
 .desktop-only {
   display: none !important;
 }
@@ -68,20 +133,202 @@ body {
   display: none !important;
 }
 
-/* =======================================
-   DESKTOP BREAKPOINT ≥ 768px
-   ======================================= */
-@media (min-width: 768px) {
+/* ───── BOTTOM NAV — MOBILE ───── */
+.bottom-nav {
+  display: flex;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--color-white);
+  border-top: 1px solid var(--color-border);
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+}
 
-  /* Reset root constraints for desktop — full width */
+/* ───── TOP HEADER — MOBILE ───── */
+.top-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: calc(var(--header-h) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 16px;
+  padding-right: 16px;
+  z-index: 1000;
+}
+
+/* ───── MAIN CONTENT AREA — MOBILE ───── */
+.main-content {
+  padding-top: calc(var(--header-h) + env(safe-area-inset-top));
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* ───── SIDEBAR — HIDDEN ON MOBILE ───── */
+.sidebar {
+  display: none;
+}
+
+/* ───── TOAST — MOBILE ───── */
+.toast-notification {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  z-index: 9999;
+}
+
+/* ───── BOTTOM SHEET — MOBILE ───── */
+.bottom-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bottom-sheet {
+  background: var(--color-white);
+  width: 100%;
+  max-height: 85vh;
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* =======================================
+   SMALL PHONES — 320px to 374px
+   iPhone SE, older Androids
+   ======================================= */
+@media (max-width: 374px) {
+  :root {
+    font-size: 13px;
+  }
+
+  .card-padding {
+    padding: 12px !important;
+  }
+
+  .care-gauge {
+    width: 120px !important;
+    height: 120px !important;
+  }
+
+  .summary-cards-row {
+    flex-direction: column !important;
+  }
+
+  .summary-cards-row>* {
+    width: 100% !important;
+    flex: none !important;
+  }
+
+  .task-icon-circle {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .task-name {
+    font-size: 14px !important;
+  }
+
+  .task-time {
+    font-size: 11px !important;
+  }
+
+  .emoji-item {
+    font-size: 28px !important;
+  }
+}
+
+/* =======================================
+   NORMAL PHONES — 375px to 392px
+   iPhone 12, 13, 14, Samsung S21, Pixel 6
+   ======================================= */
+@media (min-width: 375px) and (max-width: 392px) {
+  :root {
+    font-size: 14px;
+  }
+
+  .care-gauge {
+    width: 140px !important;
+    height: 140px !important;
+  }
+}
+
+/* =======================================
+   LARGE PHONES — 393px to 430px
+   iPhone 14 Pro, 15, 16, Samsung S23/S24
+   ======================================= */
+@media (min-width: 393px) and (max-width: 430px) {
+  :root {
+    font-size: 15px;
+  }
+
+  .care-gauge {
+    width: 160px !important;
+    height: 160px !important;
+  }
+}
+
+/* =======================================
+   EXTRA LARGE PHONES — 431px to 767px
+   Samsung Ultra, iPad mini portrait
+   ======================================= */
+@media (min-width: 431px) and (max-width: 767px) {
+  :root {
+    font-size: 15px;
+  }
+
+  #root {
+    max-width: 480px;
+  }
+
+  .card-padding {
+    padding: 20px !important;
+  }
+
+  .care-gauge {
+    width: 180px !important;
+    height: 180px !important;
+  }
+}
+
+
+/* ================================================
+   DESKTOP — 768px and above
+   Left sidebar, no bottom nav, wider layout
+   ================================================ */
+@media (min-width: 768px) {
+  :root {
+    font-size: 15px;
+  }
+
+  /* Reset root for desktop */
   #root {
     max-width: 100%;
     margin: 0;
     box-shadow: none;
-    background-color: #F8FAFC;
   }
 
-  /* Toggle visibility classes */
+  /* Visibility toggle */
   .mobile-only {
     display: none !important;
   }
@@ -94,23 +341,30 @@ body {
     display: flex !important;
   }
 
-  /* ─── SIDEBAR ─────────────────────────── */
+  /* ─── SIDEBAR ─── */
   .sidebar {
     display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: var(--sidebar-w) !important;
+    min-width: var(--sidebar-w) !important;
+    max-width: var(--sidebar-w) !important;
     flex-direction: column !important;
-    width: 240px !important;
-    min-width: 240px !important;
-    max-width: 240px !important;
-    background: #ffffff;
-    border-right: 1px solid #E5E7EB;
-    height: 100vh;
-    position: sticky;
-    top: 0;
-    padding: 32px 16px;
+    background: var(--color-white) !important;
+    border-right: 1px solid var(--color-border) !important;
+    z-index: 100 !important;
+    padding: 32px 16px !important;
     flex-shrink: 0;
   }
 
-  /* ─── DESKTOP LAYOUT SHELL ────────────── */
+  /* ─── BOTTOM NAV HIDDEN ─── */
+  .bottom-nav {
+    display: none !important;
+  }
+
+  /* ─── DESKTOP LAYOUT SHELL ─── */
   .desktop-layout {
     display: flex !important;
     flex-direction: row !important;
@@ -118,38 +372,49 @@ body {
     min-height: 100vh;
     max-width: 1200px;
     margin: 0 auto;
-    background: #F8FAFC;
   }
 
-  /* The main scrollable content area beside sidebar */
   .desktop-content {
     flex: 1 !important;
+    margin-left: var(--sidebar-w) !important;
     overflow-y: auto !important;
     padding: 32px !important;
-    display: flex !important;
-    flex-direction: column !important;
+    max-width: calc(1200px - var(--sidebar-w));
   }
 
-  /* ─── AUTH SCREENS CENTRED CARD ─────── */
+  /* ─── TOP HEADER on desktop adjusts for sidebar ─── */
+  .top-header {
+    left: var(--sidebar-w);
+    padding-top: 0;
+    min-height: var(--header-h);
+  }
+
+  /* ─── MAIN CONTENT on desktop ─── */
+  .main-content {
+    margin-left: var(--sidebar-w);
+    padding-top: var(--header-h);
+    padding-bottom: 32px;
+    max-width: calc(1200px - var(--sidebar-w));
+  }
+
+  /* ─── AUTH SCREENS — centered card ─── */
   .auth-desktop-container {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     min-height: 100vh !important;
-    background: #F8FAFC !important;
   }
 
   .auth-desktop-card {
     width: 480px !important;
     min-height: auto !important;
-    background: #ffffff !important;
+    background: var(--color-white) !important;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.10) !important;
     border-radius: 16px !important;
-    padding: 0 !important;
     overflow: hidden;
   }
 
-  /* ─── CARETAKER GRID: 60/40 ──────────── */
+  /* ─── DASHBOARD GRIDS ─── */
   .caretaker-grid {
     display: flex !important;
     flex-direction: row !important;
@@ -166,11 +431,8 @@ body {
   .caretaker-grid>div:last-child {
     flex: 0 0 38% !important;
     max-width: 38% !important;
-    position: sticky;
-    top: 0;
   }
 
-  /* ─── FAMILY GRID: 30/40/30 ─────────── */
   .family-grid {
     display: flex !important;
     flex-direction: row !important;
@@ -191,7 +453,6 @@ body {
     flex: 0 0 28% !important;
   }
 
-  /* ─── DOCTOR GRID: 35/65 ────────────── */
   .doctor-grid {
     display: flex !important;
     flex-direction: row !important;
@@ -209,7 +470,7 @@ body {
     flex: 1 !important;
   }
 
-  /* ─── PDF LAYOUT ────────────────────── */
+  /* ─── PDF desktop ─── */
   .pdf-desktop {
     max-width: 980px;
     margin: 0 auto;
@@ -225,25 +486,43 @@ body {
   .pdf-two-col>div {
     flex: 1;
   }
-}
 
-/* =======================================
-   GLOBAL UI
-   ======================================= */
+  /* ─── BOTTOM SHEET → centered modal on desktop ─── */
+  .bottom-sheet-overlay {
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
 
-/* PWA tap targets */
-button {
-  min-height: 44px;
-}
+  .bottom-sheet {
+    width: 480px;
+    max-height: 80vh;
+    border-radius: 16px;
+    padding-bottom: 0;
+  }
 
-/* Sidebar hidden by default on mobile */
-.sidebar {
-  display: none;
-}
+  /* ─── HOVER STATES (desktop only, no conflict with touch) ─── */
+  button:hover:not(:disabled),
+  [role="button"]:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+  }
 
-/* Subtle overlay on desktop behind auth cards */
-@media (min-width: 768px) {
+  .card-hover:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+  }
+
+  /* Desktop background */
   body {
     background-color: #EFF4FB;
   }
+}
+
+/* ───── SCROLLABLE CONTAINERS ───── */
+.scroll-y {
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
 }

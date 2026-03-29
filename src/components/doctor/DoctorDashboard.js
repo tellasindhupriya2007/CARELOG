@@ -205,7 +205,7 @@ export default function DoctorDashboard() {
                     }
                 />
 
-                <div className="doctor-grid" style={{ padding: spacing.pagePadding, flex: 1 }}>
+                <div className="main-content doctor-grid scroll-y" style={{ padding: spacing.pagePadding }}>
 
                     {/* Left Column: Patients List */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

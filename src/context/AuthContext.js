@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { colors } from '../styles/colors';
 import { typography } from '../styles/typography';
@@ -9,26 +9,32 @@ export const AuthContext = createContext();
 
 export const useAuthContext = () => useContext(AuthContext);
 
+const googleProvider = new GoogleAuthProvider();
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [role, setRole] = useState(null);
     const [patientId, setPatientId] = useState(null);
+    const [photoURL, setPhotoURL] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const startTime = Date.now();
 
-        // On every app load check Firebase Auth state first
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 setUser(firebaseUser);
+                setPhotoURL(firebaseUser.photoURL || null);
                 try {
                     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
                         setRole(userData.role || null);
-                        setPatientId(userData.patientId || null);
+                        setPatientId(userData.patientId || userData.assignedPatientId || null);
+                        if (userData.photoURL) setPhotoURL(userData.photoURL);
                     } else {
+                        // Edge case: user exists in Firebase Auth but not in Firestore
+                        // Don't clear role — the signInWithGoogle function handles document creation
                         setRole(null);
                         setPatientId(null);
                     }
@@ -41,9 +47,9 @@ export const AuthProvider = ({ children }) => {
                 setUser(null);
                 setRole(null);
                 setPatientId(null);
+                setPhotoURL(null);
             }
 
-            // Minimum show time of 1.5 seconds so it does not flash
             const timeElapsed = Date.now() - startTime;
             if (timeElapsed < 1500) {
                 setTimeout(() => setLoading(false), 1500 - timeElapsed);
@@ -55,29 +61,62 @@ export const AuthProvider = ({ children }) => {
         return () => unsubscribe();
     }, []);
 
-    const login = async (email, password) => {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        return userCredential.user;
-    };
+    /**
+     * Google Sign In.
+     * @param {string} selectedRole - The role the user selected on splash (family/caretaker/doctor)
+     * @returns {{ isNewUser: boolean, userRole: string, userPatientId: string|null }}
+     */
+    const signInWithGoogle = async (selectedRole) => {
+        const result = await signInWithPopup(auth, googleProvider);
+        const firebaseUser = result.user;
 
-    const register = async (name, email, password, role) => {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const newUser = userCredential.user;
+        // Check if Firestore document already exists
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
 
-        // Save user role and name to Firestore users collection
-        await setDoc(doc(db, 'users', newUser.uid), {
-            name,
-            email,
-            role,
-            patientId: null, // to be populated later
-            createdAt: new Date().toISOString()
-        });
-
-        return newUser;
+        if (userDocSnap.exists()) {
+            // Returning user — read their existing data
+            const userData = userDocSnap.data();
+            setRole(userData.role);
+            setPatientId(userData.patientId || userData.assignedPatientId || null);
+            setPhotoURL(firebaseUser.photoURL || userData.photoURL || null);
+            setUser(firebaseUser);
+            return {
+                isNewUser: false,
+                userRole: userData.role,
+                userPatientId: userData.patientId || userData.assignedPatientId || null
+            };
+        } else {
+            // New user — create Firestore document with selected role
+            const newUserData = {
+                name: firebaseUser.displayName || 'CareLog User',
+                email: firebaseUser.email || '',
+                photoURL: firebaseUser.photoURL || '',
+                role: selectedRole,
+                patientId: null,
+                createdAt: serverTimestamp()
+            };
+            await setDoc(userDocRef, newUserData);
+            setRole(selectedRole);
+            setPatientId(null);
+            setPhotoURL(firebaseUser.photoURL || null);
+            setUser(firebaseUser);
+            return {
+                isNewUser: true,
+                userRole: selectedRole,
+                userPatientId: null
+            };
+        }
     };
 
     const logout = async () => {
         await signOut(auth);
+        setUser(null);
+        setRole(null);
+        setPatientId(null);
+        setPhotoURL(null);
+        // Clear any cached data
+        try { sessionStorage.clear(); } catch (e) { }
     };
 
     const setRoleAndPatient = (newRole, newPatientId) => {
@@ -86,7 +125,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     if (loading) {
-        // While auth state is loading show the CareLog logo with pulse animation on white background
         return (
             <div style={{
                 backgroundColor: colors.white,
@@ -106,33 +144,33 @@ export const AuthProvider = ({ children }) => {
                 }}>
                     CareLog
                 </div>
-
-                {/* 3 dots pulsing one after another */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <div className="dot" style={{ animationDelay: '0s' }} />
                     <div className="dot" style={{ animationDelay: '0.2s' }} />
                     <div className="dot" style={{ animationDelay: '0.4s' }} />
                 </div>
-
                 <style>{`
-          .dot {
-            width: 12px;
-            height: 12px;
-            background-color: ${colors.primaryBlue};
-            border-radius: 50%;
-            animation: bounce 1.4s infinite ease-in-out both;
-          }
-          @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
-            40% { transform: scale(1); opacity: 1; }
-          }
-        `}</style>
+                    .dot {
+                        width: 12px;
+                        height: 12px;
+                        background-color: ${colors.primaryBlue};
+                        border-radius: 50%;
+                        animation: bounce 1.4s infinite ease-in-out both;
+                    }
+                    @keyframes bounce {
+                        0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+                        40% { transform: scale(1); opacity: 1; }
+                    }
+                `}</style>
             </div>
         );
     }
 
     return (
-        <AuthContext.Provider value={{ user, role, patientId, setPatientId, login, register, logout, setRoleAndPatient }}>
+        <AuthContext.Provider value={{
+            user, role, patientId, photoURL,
+            setPatientId, signInWithGoogle, logout, setRoleAndPatient
+        }}>
             {children}
         </AuthContext.Provider>
     );

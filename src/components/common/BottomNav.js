@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { colors } from '../../styles/colors';
-import { spacing } from '../../styles/spacing';
 import * as LucideIcons from 'lucide-react';
 
 export default function BottomNav({ navItems }) {
@@ -9,19 +8,8 @@ export default function BottomNav({ navItems }) {
     const location = useLocation();
 
     return (
-        <div style={{
-            height: spacing.bottomNavHeight,
-            width: '100%',
+        <div className="bottom-nav" style={{
             backgroundColor: colors.white,
-            borderTop: `1px solid ${colors.border}`,
-            borderBottomLeftRadius: spacing.borderRadius.bottomNav,
-            borderBottomRightRadius: spacing.borderRadius.bottomNav,
-            display: 'flex',
-            justifyContent: 'space-around',
-            alignItems: 'center',
-            position: 'sticky',
-            bottom: 0,
-            zIndex: 10,
         }}>
             {navItems.map((item, index) => {
                 const isActive = location.pathname.startsWith(item.path);
@@ -38,12 +26,13 @@ export default function BottomNav({ navItems }) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: 'pointer',
-                            height: '100%',
                             minWidth: '44px',
-                            flex: 1
+                            minHeight: '44px',
+                            flex: 1,
+                            paddingTop: '8px',
                         }}
                     >
-                        {Icon && <Icon size={24} color={color} style={{ marginBottom: '4px' }} />}
+                        {Icon && <Icon size={22} color={color} style={{ marginBottom: '3px' }} />}
                         <span style={{
                             fontSize: '10px',
                             color: color,
@@ -54,7 +43,7 @@ export default function BottomNav({ navItems }) {
                             {isActive && (
                                 <div style={{
                                     position: 'absolute',
-                                    bottom: '-6px',
+                                    bottom: '-5px',
                                     left: '50%',
                                     transform: 'translateX(-50%)',
                                     width: '4px',

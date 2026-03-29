@@ -12,6 +12,7 @@ export default function PrimaryButton({ label, onClick, isLoading, disabled, ...
             style={{
                 width: '100%',
                 height: '52px',
+                minHeight: '48px',
                 backgroundColor: colors.primaryBlue,
                 color: colors.white,
                 fontSize: typography.buttonText.fontSize,

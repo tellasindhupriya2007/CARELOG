@@ -20,7 +20,7 @@ export default function Splash() {
 
   const RoleCard = ({ title, subtitle, bg, Icon, roleName }) => (
     <div
-      onClick={() => navigate('/auth/login', { state: { role: roleName } })}
+      onClick={() => navigate('/auth/confirm', { state: { role: roleName } })}
       style={{
         backgroundColor: bg,
         borderRadius: spacing.borderRadius.card,

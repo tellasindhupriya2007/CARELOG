@@ -11,6 +11,7 @@ export default function SecondaryButton({ label, onClick, disabled, ...props }) 
             style={{
                 width: '100%',
                 height: '52px',
+                minHeight: '48px',
                 backgroundColor: colors.white,
                 border: `1.5px solid ${colors.primaryBlue}`,
                 color: colors.primaryBlue,

@@ -6,8 +6,7 @@ import PwaWrapper from './components/common/PwaWrapper';
 
 // Auth
 import Splash from './pages/auth/Splash';
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
+import RoleConfirm from './pages/auth/RoleConfirm';
 
 // Caretaker
 import CaretakerHome from './pages/caretaker/Home';
@@ -44,10 +43,13 @@ function App() {
             {/* Base Fallback (redirects to splash) */}
             <Route path="/" element={<Navigate to="/auth/splash" replace />} />
 
-            {/* Auth Group */}
+            {/* Auth Group — Google Sign In only */}
             <Route path="/auth/splash" element={<Splash />} />
-            <Route path="/auth/login" element={<Login />} />
-            <Route path="/auth/register" element={<Register />} />
+            <Route path="/auth/confirm" element={<RoleConfirm />} />
+
+            {/* Legacy routes — redirect to new flow */}
+            <Route path="/auth/login" element={<Navigate to="/auth/splash" replace />} />
+            <Route path="/auth/register" element={<Navigate to="/auth/splash" replace />} />
 
             {/* Caretaker Group */}
             <Route element={<PrivateRoute allowedRoles={['caretaker']} />}>
@@ -58,7 +60,7 @@ function App() {
               <Route path="/caretaker/handover" element={<ShiftHandover />} />
             </Route>
 
-            {/* Family Group (Includes onboarding since family sets up the plan) */}
+            {/* Family Group */}
             <Route element={<PrivateRoute allowedRoles={['family']} />}>
               <Route path="/family/dashboard" element={<FamilyHome />} />
               <Route path="/family/alerts" element={<FamilyAlerts />} />

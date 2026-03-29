@@ -5,6 +5,7 @@ import { spacing } from '../../styles/spacing';
 export default function Card({ children, style, onClick, ...props }) {
     return (
         <div
+            className={onClick ? 'card-hover' : ''}
             onClick={onClick}
             style={{
                 backgroundColor: colors.cardBackground,
@@ -14,7 +15,9 @@ export default function Card({ children, style, onClick, ...props }) {
                 border: 'none',
                 width: '100%',
                 cursor: onClick ? 'pointer' : 'default',
-                transition: onClick ? 'transform 0.1s ease' : 'none',
+                transition: onClick ? 'transform 0.1s ease, box-shadow 0.2s ease' : 'none',
+                overflowX: 'hidden',
+                wordBreak: 'break-word',
                 ...style
             }}
             onPointerDown={(e) => {

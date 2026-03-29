@@ -8,23 +8,22 @@ export default function Sidebar({ navItems }) {
     const location = useLocation();
 
     return (
-        <div className="sidebar" style={{
-            position: 'sticky',
-            top: 0,
-            height: '100vh',
-            maxWidth: '240px',
-            minWidth: '240px'
-        }}>
+        <div className="sidebar">
+            {/* Logo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px', paddingLeft: '8px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: colors.primaryBlue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                    width: '32px', height: '32px', borderRadius: '50%',
+                    backgroundColor: colors.primaryBlue,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
                     <span style={{ color: colors.white, fontWeight: 'bold', fontSize: '18px' }}>C</span>
                 </div>
                 <span style={{ fontSize: '20px', fontWeight: 'bold', color: colors.primaryBlue }}>CareLog</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Nav Items */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {navItems.map((item, index) => {
-                    // Match path
                     const isActive = location.pathname.startsWith(item.path);
                     const Icon = LucideIcons[item.icon];
                     const bg = isActive ? '#EFF6FF' : 'transparent';
@@ -43,6 +42,7 @@ export default function Sidebar({ navItems }) {
                                 backgroundColor: bg,
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
+                                minHeight: '44px',
                             }}
                         >
                             {Icon && <Icon size={20} color={color} />}

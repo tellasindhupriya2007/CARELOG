@@ -12,6 +12,7 @@ export default function DangerButton({ label, onClick, disabled, isLoading, ...p
             style={{
                 width: '100%',
                 height: '52px',
+                minHeight: '48px',
                 backgroundColor: colors.alertRed,
                 color: colors.white,
                 border: 'none',

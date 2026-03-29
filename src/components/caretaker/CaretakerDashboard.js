@@ -60,8 +60,8 @@ export default function CaretakerDashboard() {
                     setFirstName(userData.name.split(' ')[0]);
                     if (!patientId && userData.assignedPatientId) {
                         setPatientId(userData.assignedPatientId);
-                    } else if (!userData.assignedPatientId) {
-                        setError("No patient assigned to this account.");
+                    } else if (!userData.assignedPatientId && !patientId) {
+                        // No patient linked — show linking screen (not an error)
                         setLoading(false);
                     }
                 }
@@ -350,23 +350,19 @@ export default function CaretakerDashboard() {
 
 
                 {toast && (
-                    <div style={{
-                        position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+                    <div className="toast-notification" style={{
                         backgroundColor: toast.type === 'success' ? colors.successGreen : colors.alertRed,
                         color: toast.type === 'success' ? colors.primaryGreen : colors.white,
                         padding: '12px 24px', borderRadius: spacing.borderRadius.badge, fontWeight: '600',
-                        boxShadow: spacing.shadows.card, zIndex: 100, animation: 'slideDown 0.3s ease-out'
+                        boxShadow: spacing.shadows.card, textAlign: 'center', animation: 'slideDown 0.3s ease-out'
                     }}>
                         {toast.message}
                     </div>
                 )}
 
-                {/* TopHeader Native Build */}
-                <div style={{
-                    height: spacing.topHeaderHeight, backgroundColor: colors.white, borderBottom: `1px solid ${colors.border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', position: 'sticky', top: 0, zIndex: 10
-                }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {/* TopHeader */}
+                <div className="top-header">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
                         <div style={{ fontSize: typography.sectionHeading.fontSize, fontWeight: typography.sectionHeading.fontWeight, color: colors.textPrimary }}>
                             Good Morning, {firstName}
                         </div>
@@ -376,10 +372,10 @@ export default function CaretakerDashboard() {
                             </span>
                         )}
                     </div>
-                    <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => navigate('/caretaker/alerts')}>
-                        <Bell size={24} color={colors.textPrimary} />
+                    <div style={{ position: 'relative', cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => navigate('/caretaker/alerts')}>
+                        <Bell size={22} color={colors.textPrimary} />
                         {alertCount > 0 && (
-                            <span style={{ position: 'absolute', top: '-4px', right: '-4px', backgroundColor: colors.alertRed, color: colors.white, fontSize: '10px', fontWeight: 'bold', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ position: 'absolute', top: '6px', right: '4px', backgroundColor: colors.alertRed, color: colors.white, fontSize: '10px', fontWeight: 'bold', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {alertCount}
                             </span>
                         )}
@@ -413,7 +409,7 @@ export default function CaretakerDashboard() {
                     </div>
                 )}
 
-                <div style={{ padding: spacing.pagePadding, flex: 1, overflowY: 'auto' }}>
+                <div className="main-content scroll-y" style={{ padding: spacing.pagePadding }}>
                     <p style={{ fontSize: '14px', color: colors.textSecondary, marginBottom: '16px' }}>{formatDisplayDate(getTodayDateString())}</p>
 
                     {error && <ErrorCard message={error} />}
@@ -482,9 +478,9 @@ export default function CaretakerDashboard() {
                 className="mobile-only"
                 onClick={() => navigate('/caretaker/vitals')}
                 style={{
-                    position: 'fixed', bottom: '88px', right: '16px', width: '56px', height: '56px',
+                    position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom))', right: '16px', width: '56px', height: '56px',
                     borderRadius: '50%', backgroundColor: colors.primaryBlue, boxShadow: spacing.shadows.button,
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', zIndex: 10
+                    display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', zIndex: 999
                 }}
             >
                 <Plus size={28} color={colors.white} />
@@ -497,8 +493,8 @@ export default function CaretakerDashboard() {
             {/* Confirmation Bottom Sheet */}
             {
                 showConfirmSheet && selectedTask && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', animation: 'fadeIn 0.2s' }}>
-                        <div style={{ backgroundColor: colors.white, width: '100%', maxWidth: '430px', margin: '0 auto', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: spacing.pagePadding, paddingBottom: '32px', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+                    <div className="bottom-sheet-overlay" style={{ animation: 'fadeIn 0.2s' }}>
+                        <div className="bottom-sheet" style={{ padding: spacing.pagePadding, paddingBottom: 'calc(32px + env(safe-area-inset-bottom))', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
                             <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', textAlign: 'center' }}>Mark "{selectedTask.name}" as complete?</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <PrimaryButton label="Confirm" onClick={confirmCompletion} isLoading={submitting} disabled={submitting} />
@@ -512,11 +508,11 @@ export default function CaretakerDashboard() {
             {/* Note Bottom Sheet */}
             {
                 showNoteSheet && selectedTask && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', animation: 'fadeIn 0.2s' }}>
-                        <div style={{ backgroundColor: colors.white, width: '100%', maxWidth: '430px', margin: '0 auto', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: spacing.pagePadding, paddingBottom: '32px', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+                    <div className="bottom-sheet-overlay" style={{ animation: 'fadeIn 0.2s' }}>
+                        <div className="bottom-sheet" style={{ padding: spacing.pagePadding, paddingBottom: 'calc(32px + env(safe-area-inset-bottom))', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                 <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Add Note</h3>
-                                <button onClick={() => setShowNoteSheet(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} color={colors.textSecondary} /></button>
+                                <button onClick={() => setShowNoteSheet(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={24} color={colors.textSecondary} /></button>
                             </div>
                             <p style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '12px' }}>Attaching note to: {selectedTask.name}</p>
                             <InputField

@@ -213,7 +213,7 @@ export default function FamilyDashboard() {
                     }
                 />
 
-                <div style={{ padding: spacing.pagePadding, flex: 1, overflowY: 'auto' }}>
+                <div className="main-content scroll-y" style={{ padding: spacing.pagePadding }}>
 
                     {error ? (
                         <ErrorCard message={error} />
