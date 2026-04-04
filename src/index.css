@@ -169,7 +169,7 @@ a,
 
 /* ───── MAIN CONTENT AREA — MOBILE ───── */
 .main-content {
-  padding-top: calc(var(--header-h) + env(safe-area-inset-top));
+  padding-top: calc(16px + env(safe-area-inset-top));
   padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
   min-height: 100vh;
   width: 100%;
@@ -370,31 +370,36 @@ a,
     flex-direction: row !important;
     width: 100%;
     min-height: 100vh;
-    max-width: 1200px;
-    margin: 0 auto;
+    margin: 0;
+    max-width: none !important;
   }
 
   .desktop-content {
     flex: 1 !important;
     margin-left: var(--sidebar-w) !important;
     overflow-y: auto !important;
-    padding: 32px !important;
-    max-width: calc(1200px - var(--sidebar-w));
+    padding: 0 !important; /* Managed by children */
+    background-color: var(--color-bg);
+    min-width: 0;
   }
 
   /* ─── TOP HEADER on desktop adjusts for sidebar ─── */
   .top-header {
     left: var(--sidebar-w);
+    right: 0;
     padding-top: 0;
     min-height: var(--header-h);
+    width: auto;
+    z-index: 50;
   }
 
-  /* ─── MAIN CONTENT on desktop ─── */
+  /* ─── MAIN CONTENT on desktop — Full control over internal spacing ─── */
   .main-content {
-    margin-left: var(--sidebar-w);
-    padding-top: var(--header-h);
-    padding-bottom: 32px;
-    max-width: calc(1200px - var(--sidebar-w));
+    margin-left: 0 !important;
+    padding: 40px !important; /* Restored original spacing */
+    padding-top: 40px !important; /* No extra fixed header room needed due to sticky */
+    padding-bottom: 60px !important;
+    width: 100%;
   }
 
   /* ─── AUTH SCREENS — centered card ─── */
@@ -525,4 +530,142 @@ a,
 .scroll-y {
   overflow-y: scroll;
   -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================================================
+   MOBILE & TABLET OVERRIDES (ADDED PER REQUEST)
+   Strictly targets responsive views without modifying base or desktop styles
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  /* SIDEBAR: Hide broadly on tablets and mobile */
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Reset desktop content shell limits */
+  .desktop-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* HEADER: Full width */
+  .top-header,
+  header {
+    left: 0 !important;
+    width: 100% !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* SPACING: Aggressively override ALL inline main-content paddings */
+  .main-content {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-top: calc(16px + env(safe-area-inset-top)) !important;
+    padding-bottom: 80px !important;
+  }
+
+  /* 
+     LAYOUT: Aggressive Grid-to-Flex Conversion
+     Converts any inline grid component to a vertical flex stack 
+  */
+  .dashboard-structure,
+  .caretaker-grid,
+  .family-grid,
+  .doctor-grid,
+  div[style*="display: grid"] {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  /* Ensure child columns don't force width */
+  .dashboard-structure > div,
+  .caretaker-grid > div,
+  .family-grid > div,
+  .doctor-grid > div {
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+
+  /* Convert specific inline flex rows to columns (e.g. side-by-side inputs) */
+  div[style*="display: flex"][style*="gap: 16px"]:not([style*="align-items: center"]),
+  div[style*="display: flex"][style*="gap: 20px"]:not([style*="align-items: center"]) {
+    flex-direction: column !important;
+  }
+
+  /* EXCEPTIONS: Allow horizontal flex for specific UI components */
+  div[style*="overflow-x: auto"] { 
+    flex-direction: row !important; 
+  }
+  header div,
+  div[style*="justify-content: space-between"],
+  div[style*="align-items: center"] {
+    flex-direction: row !important;
+  }
+
+  /* BUTTONS: Expand main action buttons to full width */
+  button[style*="height: 44px"]:not([style*="50%"]):not([style*="borderRadius: 50%"]),
+  button[style*="height: 48px"],
+  button[style*="height: 52px"],
+  .primary-button, 
+  .secondary-button {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* PADDING: Condense cards */
+  div[style*="padding: 24px"] {
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra compact view for small phones */
+  .main-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* Adjust inline huge paddings */
+  div[style*="padding: 32px"] {
+    padding: 20px !important;
+  }
+  div[style*="padding: 40px"] {
+    padding: 24px !important;
+  }
+
+  h1 { font-size: 24px !important; }
+  h2 { font-size: 18px !important; }
+  h3 { font-size: 16px !important; }
+}
+
+/* ───── CARETAKER RESPONSIVE GRID OVERHAUL ───── */
+.caretaker-responsive-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  width: 100%;
+}
+
+.caretaker-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.caretaker-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .caretaker-responsive-grid {
+    grid-template-columns: 1fr;
+  }
 }

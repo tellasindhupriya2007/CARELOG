@@ -1,6 +1,3 @@
 import React from 'react';
-import AlertsComponent from '../../components/doctor/Alerts';
-
-export default function DoctorAlerts() {
-    return <AlertsComponent />;
-}
+import DoctorAlertsComponent from '../../components/doctor/Alerts';
+export default function DoctorAlerts() { return <DoctorAlertsComponent />; }

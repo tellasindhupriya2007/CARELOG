@@ -1,6 +1,6 @@
 import React from 'react';
-import AlertScreenComponent from '../../components/family/AlertScreen';
+import GlobalAlertsScreen from '../../components/common/GlobalAlertsScreen';
 
 export default function FamilyAlerts() {
-  return <AlertScreenComponent />;
+  return <GlobalAlertsScreen />;
 }

@@ -4,7 +4,7 @@ import { useAuthContext } from '../../context/AuthContext';
 import { collection, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getTodayDateString } from '../../utils/dateHelpers';
-import TopHeader from '../common/TopHeader';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import PrimaryButton from '../common/PrimaryButton';
 import SecondaryButton from '../common/SecondaryButton';
 import DangerButton from '../common/DangerButton';
@@ -12,8 +12,9 @@ import Card from '../common/Card';
 import SkeletonCard from '../common/SkeletonCard';
 import { colors } from '../../styles/colors';
 import { spacing } from '../../styles/spacing';
-import { CheckCircle2, XCircle, HeartPulse, Smile, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, HeartPulse, Smile, Pill, Loader2, Thermometer, Activity } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { subscribeToDailyLogs, subscribeToTasks } from '../../services/taskService';
 
 export default function ShiftHandover() {
     const navigate = useNavigate();
@@ -25,21 +26,22 @@ export default function ShiftHandover() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [ending, setEnding] = useState(false);
 
+    const [tasks, setTasks] = useState([]);
+    const [completions, setCompletions] = useState({});
+
     useEffect(() => {
         const fetchHandoverData = async () => {
             if (!user || !patientId) return;
             try {
-                // Get name
+                // Get caretaker name
                 const uDoc = await getDoc(doc(db, 'users', user.uid));
                 if (uDoc.exists()) setCaretakerName(uDoc.data().name || 'Caretaker');
 
-                // Get log
+                // Initial fetch for vitals and observations specifically for handover summary
                 const q = query(collection(db, 'dailyLogs'), where('patientId', '==', patientId), where('date', '==', getTodayDateString()));
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     setDailyLog(snap.docs[0].data());
-                } else {
-                    setDailyLog({ tasks: [], vitals: [], observations: [], careScore: 0 });
                 }
             } catch (err) {
                 console.error(err);
@@ -47,6 +49,15 @@ export default function ShiftHandover() {
             setLoading(false);
         };
         fetchHandoverData();
+
+        // Real-time completions & tasks
+        const unsubTasks = subscribeToTasks(patientId, setTasks);
+        const unsubLogs = subscribeToDailyLogs(patientId, setCompletions);
+
+        return () => {
+            unsubTasks();
+            unsubLogs();
+        };
     }, [user, patientId]);
 
     const handleEndShift = async () => {
@@ -82,20 +93,32 @@ export default function ShiftHandover() {
         { name: 'Remaining', value: Math.max(0, 10 - (dailyLog.careScore || 0)), color: colors.border }
     ] : [];
 
-    // Derive mapped elements
-    const completedTasks = dailyLog?.tasks?.filter(t => t.status === 'Completed') || [];
-    const missedTasks = dailyLog?.tasks?.filter(t => t.status !== 'Completed') || [];
+    // Derive mapped elements using new task service data
+    const completedTasks = tasks.filter(t => completions[t.id]?.completed);
+    const missedTasks = tasks.filter(t => !completions[t.id]?.completed);
 
     const vitals = dailyLog?.vitals || [];
     const observations = dailyLog?.observations || [];
 
-    const emMap = { "Very Sad": '😫', "Sad": '😔', "Neutral": '😐', "Happy": '🙂', "Very Happy": '😄' };
+    const emMap = { "Very Low": '😫', "Low": '😔', "Neutral": '😐', "Good": '🙂', "Excellent": '😄' };
 
     return (
         <div style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <TopHeader title="Shift Handover" showBack onBack={() => navigate(-1)} />
+            <ScreenHeader title="Shift Handover" showBack onBack={() => navigate(-1)} />
 
-            <div style={{ padding: spacing.pagePadding, flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '90px' }}>
+            {/* Standardized Main Container */}
+            <div 
+                className="main-content" 
+                style={{ 
+                    padding: 'calc(var(--header-h) + 24px + env(safe-area-inset-top)) 20px 140px 20px', 
+                    flex: 1, 
+                    width: '100%',
+                    maxWidth: '1200px',
+                    margin: '0 auto', 
+                    alignSelf: 'center',
+                    boxSizing: 'border-box'
+                }}
+            >
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <SkeletonCard style={{ height: '80px' }} />
@@ -105,80 +128,113 @@ export default function ShiftHandover() {
                 ) : (
                     <>
                         {/* Summary Header */}
-                        <Card style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '16px' }}>
-                            <span style={{ fontSize: '16px', fontWeight: '600', color: colors.textPrimary }}>Today's Shift</span>
-                            <span style={{ fontSize: '14px', color: colors.textSecondary }}>Caretaker: {caretakerName}</span>
-                            <span style={{ fontSize: '12px', color: colors.textSecondary }}>Date: {new Date().toLocaleDateString()}</span>
+                        <Card style={{ padding: '24px', borderLeft: `6px solid ${colors.primaryBlue}` }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>Clinical Shift Summary</span>
+                                <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, backgroundColor: colors.lightBlue, padding: '4px 8px', borderRadius: '4px' }}>
+                                    {getTodayDateString()}
+                                </span>
+                            </div>
+                            <span style={{ fontSize: '14px', color: colors.textSecondary, fontWeight: '700' }}>Caretaker: {caretakerName}</span>
                         </Card>
 
-                        {/* Care Score Gauge */}
-                        <Card style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: colors.textPrimary, marginBottom: '8px' }}>Care Score</span>
-                            <div style={{ position: 'relative', width: '160px', height: '160px' }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={scoreData}
-                                            cx="50%" cy="50%" innerRadius={65} outerRadius={80}
-                                            startAngle={225} endAngle={-45} stroke="none" cornerRadius={12}
-                                            dataKey="value"
-                                        >
-                                            {scoreData.map((e, index) => <Cell key={index} fill={e.color} />)}
-                                        </Pie>
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '36px', fontWeight: '700', color: getScoreColor(dailyLog?.careScore) }}>{dailyLog?.careScore || 0}</span>
-                                </div>
+                        {/* Shift Stats Grid - Equal Height */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%' }}>
+                            <Card style={{ 
+                                padding: '24px', backgroundColor: '#F0FDF4', border: '1.5px solid #BBF7D0', 
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' 
+                            }}>
+                                <CheckCircle2 size={24} color="#166534" />
+                                <span style={{ fontSize: '32px', fontWeight: '900', color: '#166534' }}>{completedTasks.length}</span>
+                                <span style={{ fontSize: '10px', fontWeight: '800', color: '#166534', opacity: 0.8, textTransform: 'uppercase' }}>Tasks Done</span>
+                            </Card>
+                            <Card style={{ 
+                                padding: '24px', backgroundColor: missedTasks.length > 0 ? '#FEF2F2' : '#F8FAFC', 
+                                border: missedTasks.length > 0 ? '1.5px solid #FECACA' : `1.5px solid ${colors.border}`, 
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' 
+                            }}>
+                                <XCircle size={24} color={missedTasks.length > 0 ? '#991B1B' : colors.textSecondary} />
+                                <span style={{ fontSize: '32px', fontWeight: '900', color: missedTasks.length > 0 ? '#991B1B' : colors.textPrimary }}>{missedTasks.length}</span>
+                                <span style={{ fontSize: '10px', fontWeight: '800', color: missedTasks.length > 0 ? '#991B1B' : colors.textSecondary, opacity: 0.8, textTransform: 'uppercase' }}>Pending</span>
+                            </Card>
+                        </div>
+
+                        {/* Categorical Observations */}
+                        <Card style={{ padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                <Smile size={20} color={colors.primaryBlue} /> 
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>General Status</h3>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {[
+                                    { label: 'Speech', status: 'CLEAR', color: colors.primaryGreen },
+                                    { label: 'Appetite', status: 'NORMAL', color: colors.primaryGreen },
+                                    { label: 'Activity', status: 'STABLE', color: colors.primaryBlue }
+                                ].map((item, id) => (
+                                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
+                                        <span style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>{item.label}</span>
+                                        <span style={{ fontSize: '12px', fontWeight: '900', color: item.color, backgroundColor: colors.white, padding: '4px 12px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                            {item.status}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </Card>
 
-                        {/* Completed Tasks */}
-                        {completedTasks.length > 0 && (
-                            <Card style={{ padding: '16px' }}>
-                                <span style={{ fontSize: '14px', fontWeight: '600', color: colors.primaryGreen, marginBottom: '12px', display: 'block' }}>Completed Tasks</span>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {completedTasks.map((t, idx) => (
-                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <CheckCircle2 size={16} color={colors.primaryGreen} />
-                                            <span style={{ fontSize: '14px', color: colors.textPrimary }}>{t.name}</span>
+                        {/* Medication Adherence */}
+                        <Card style={{ padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                <Pill size={20} color={colors.primaryBlue} /> 
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Medication Tracker</h3>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {tasks.filter(t => t.category === 'Medication').length > 0 ? (
+                                    tasks.filter(t => t.category === 'Medication').map((m, idx) => (
+                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
+                                            <div>
+                                                <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>{m.title}</div>
+                                                <div style={{ fontSize: '12px', color: colors.textSecondary, fontWeight: '700' }}>{m.time}</div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {completions[m.id]?.completed ? (
+                                                    <CheckCircle2 size={16} color={colors.primaryGreen} />
+                                                ) : (
+                                                    <XCircle size={16} color={colors.alertRed} />
+                                                )}
+                                                <span style={{ fontSize: '12px', fontWeight: '900', color: completions[m.id]?.completed ? colors.primaryGreen : colors.alertRed }}>
+                                                    {completions[m.id]?.completed ? 'ADMINISTERED' : 'PENDING'}
+                                                </span>
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </Card>
-                        )}
+                                    ))
+                                ) : (
+                                    <p style={{ fontSize: '13px', color: colors.textSecondary, textAlign: 'center', padding: '12px' }}>No medication tasks scheduled.</p>
+                                )}
+                            </div>
+                        </Card>
 
-                        {/* Missed Tasks */}
-                        {missedTasks.length > 0 && (
-                            <Card style={{ padding: '16px' }}>
-                                <span style={{ fontSize: '14px', fontWeight: '600', color: colors.alertRed, marginBottom: '12px', display: 'block' }}>Missed / Pending Tasks</span>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {missedTasks.map((t, idx) => (
-                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <XCircle size={16} color={colors.alertRed} />
-                                            <span style={{ fontSize: '14px', color: colors.textPrimary }}>{t.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </Card>
-                        )}
-
-                        {/* Vitals Summary */}
-                        <Card style={{ padding: '16px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: colors.textPrimary, marginBottom: '12px', display: 'block' }}>Vitals Logged</span>
+                        {/* Vitals Summary Table */}
+                        <Card style={{ padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                <Activity size={20} color={colors.primaryBlue} /> 
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Vitals Trend</h3>
+                            </div>
                             {vitals.length === 0 ? (
-                                <span style={{ fontSize: '14px', color: colors.textSecondary }}>No vitals recorded today.</span>
+                                <p style={{ fontSize: '13px', color: colors.textSecondary, textAlign: 'center', padding: '20px' }}>No vitals recorded.</p>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {vitals.map((v, idx) => (
-                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: idx !== vitals.length - 1 ? `1px solid ${colors.border}` : 'none', paddingBottom: '8px', marginBottom: '4px' }}>
+                                        <div key={idx} style={{ 
+                                            display: 'flex', justifyContent: 'space-between', padding: '14px 16px', 
+                                            borderBottom: idx !== vitals.length - 1 ? `1px solid ${colors.border}` : 'none' 
+                                        }}>
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontSize: '14px', fontWeight: '500', color: colors.textPrimary }}>BP: {v.bpSystolic}/{v.bpDiastolic}</span>
-                                                <span style={{ fontSize: '12px', color: colors.textSecondary }}>{new Date(v.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>BP: {v.bpSystolic}/{v.bpDiastolic}</span>
+                                                <span style={{ fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>HR: {v.heartRate} bpm</span>
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                <span style={{ fontSize: '14px', color: v.alertTriggered ? colors.alertRed : colors.primaryGreen }}>{v.alertTriggered ? 'Abnormal' : 'Normal'}</span>
-                                                <span style={{ fontSize: '12px', color: colors.textSecondary }}>HR: {v.heartRate} | Temp: {v.temperature}</span>
+                                                <span style={{ fontSize: '14px', fontWeight: '800', color: v.alertTriggered ? colors.alertRed : colors.primaryGreen }}>{v.alertTriggered ? 'Abnormal' : 'Stable'}</span>
+                                                <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary }}>{new Date(v.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -186,67 +242,96 @@ export default function ShiftHandover() {
                             )}
                         </Card>
 
-                        {/* Observations Summary */}
-                        <Card style={{ padding: '16px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: colors.textPrimary, marginBottom: '12px', display: 'block' }}>Observations Logged</span>
+                        {/* Recent Observations */}
+                        <Card style={{ padding: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                <Loader2 size={20} color={colors.primaryBlue} /> 
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Observation Log</h3>
+                            </div>
                             {observations.length === 0 ? (
-                                <span style={{ fontSize: '14px', color: colors.textSecondary }}>No observations recorded today.</span>
+                                <p style={{ fontSize: '13px', color: colors.textSecondary, textAlign: 'center', padding: '20px' }}>No session notes available.</p>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {observations.map((o, idx) => (
-                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
                                             <span style={{ fontSize: '24px' }}>{o.mood ? emMap[o.mood] : '📝'}</span>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontSize: '14px', color: o.isCritical ? colors.alertRed : colors.textPrimary, fontWeight: o.isCritical ? '600' : '400' }}>
-                                                    {o.isCritical ? 'Critical Warning Flagged' : (o.mood ? `Mood: ${o.mood}` : 'Audio Note Logged')}
+                                            <div style={{ flex: 1 }}>
+                                                <span style={{ fontSize: '14px', fontWeight: '800', color: o.isCritical ? colors.alertRed : colors.textPrimary }}>
+                                                    {o.isCritical ? 'Critical clinical flag' : (o.mood ? `Mood: ${o.mood}` : 'Observation Note')}
                                                 </span>
-                                                <span style={{ fontSize: '12px', color: colors.textSecondary }}>{new Date(o.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <p style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '4px', fontWeight: '600' }}>
+                                                    Clocked at {new Date(o.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </Card>
-
                     </>
                 )}
             </div>
 
-            {/* Bottom Button Always Visible */}
-            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: colors.white, padding: '16px', borderTop: `1px solid ${colors.border}`, zIndex: 10 }}>
-                <div style={{ width: '100%', maxWidth: '430px', margin: '0 auto' }}>
-                    <DangerButton label="End Shift" onClick={() => setShowConfirm(true)} disabled={loading} />
+            {/* Bottom Button Fixed in Viewport */}
+            <div style={{ 
+                position: 'fixed', bottom: 0, left: 0, right: 0, 
+                backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)', 
+                padding: '24px 24px calc(24px + env(safe-area-inset-bottom))', 
+                borderTop: `1px solid ${colors.border}`, zIndex: 1001, 
+                display: 'flex', justifyContent: 'center' 
+            }}>
+                <div style={{ width: '100%', maxWidth: '440px' }}>
+                    <button 
+                        onClick={() => setShowConfirm(true)} 
+                        disabled={loading}
+                        style={{
+                            width: '100%', height: '56px', backgroundColor: colors.primaryGreen, color: colors.white,
+                            borderRadius: '16px', border: 'none', fontSize: '16px', fontWeight: '900',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                            boxShadow: `0 8px 24px ${colors.primaryGreen}33`
+                        }}
+                    >
+                        <CheckCircle2 size={24} />
+                        RECORD SHIFT HANDOFF
+                    </button>
                 </div>
             </div>
 
-            {/* Confirmation Dialog */}
+            {/* Confirmation Modal */}
             {showConfirm && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: spacing.pagePadding, animation: 'fadeIn 0.2s' }}>
-                    <div style={{ backgroundColor: colors.white, width: '100%', maxWidth: '340px', borderRadius: spacing.borderRadius.card, padding: '24px', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', textAlign: 'center' }}>End Shift?</h3>
-                        <p style={{ fontSize: '14px', color: colors.textSecondary, textAlign: 'center', marginBottom: '24px', lineHeight: '1.5' }}>
-                            Are you sure you want to end your shift? The next caretaker will see this summary.
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', animation: 'fadeIn 0.2s' }}>
+                    <div style={{ backgroundColor: colors.white, width: '100%', maxWidth: '360px', borderRadius: '16px', padding: '32px', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ fontSize: '20px', fontWeight: '900', marginBottom: '16px', textAlign: 'center' }}>End Session?</h3>
+                        <p style={{ fontSize: '14px', color: colors.textSecondary, textAlign: 'center', marginBottom: '32px', lineHeight: '1.6', fontWeight: '600' }}>
+                            Are you ready to finalize this shift record? All logged vitals and activities will be summarized for the clinical team.
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <button
                                 onClick={handleEndShift}
                                 disabled={ending}
                                 style={{
-                                    width: '100%', height: '52px', backgroundColor: colors.alertRed, color: colors.white,
-                                    fontSize: '16px', fontWeight: '600', borderRadius: spacing.borderRadius.button, border: 'none', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    width: '100%', height: '56px', backgroundColor: colors.alertRed, color: colors.white,
+                                    fontSize: '16px', fontWeight: '900', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 24px ${colors.alertRed}22`
                                 }}
                             >
-                                {ending ? <Loader2 size={24} className="spinner" /> : "Confirm End Shift"}
-                                <style>{`.spinner { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+                                {ending ? <Loader2 size={24} className="spinner" /> : "YES, FINALIZE SHIFT"}
                             </button>
-                            <SecondaryButton label="Cancel" onClick={() => setShowConfirm(false)} disabled={ending} />
+                            <button 
+                                onClick={() => setShowConfirm(false)} 
+                                disabled={ending}
+                                style={{ background: 'none', border: 'none', color: colors.textSecondary, fontWeight: '800', fontSize: '14px', padding: '12px', cursor: 'pointer' }}
+                            >
+                                CANCEL
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
             <style>{`
+                .spinner { animation: spin 1s linear infinite; }
+                @keyframes spin { 100% { transform: rotate(360deg); } }
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
             `}</style>

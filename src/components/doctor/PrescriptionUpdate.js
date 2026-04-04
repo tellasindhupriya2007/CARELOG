@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import TopHeader from '../common/TopHeader';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import PrimaryButton from '../common/PrimaryButton';
 import SecondaryButton from '../common/SecondaryButton';
 import InputField from '../common/InputField';
@@ -158,7 +158,7 @@ export default function PrescriptionUpdate() {
     return (
         <div style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-            <TopHeader showBack onBack={() => navigate(-1)} title={
+            <ScreenHeader showBack onBack={() => navigate(-1)} title={
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <span style={{ fontSize: '18px', fontWeight: '700', color: colors.textPrimary }}>Update Prescription</span>
                     <span style={{ fontSize: '12px', color: colors.textSecondary }}>{patientNamePassed}</span>

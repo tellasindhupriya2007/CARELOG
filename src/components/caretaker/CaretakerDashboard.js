@@ -4,7 +4,7 @@ import { useAuthContext } from '../../context/AuthContext';
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getTodayDateString, formatDisplayDate } from '../../utils/dateHelpers';
-import TopHeader from '../../components/common/TopHeader';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import Card from '../../components/common/Card';
 import ErrorCard from '../../components/common/ErrorCard';
 import SkeletonCard from '../../components/common/SkeletonCard';
@@ -16,8 +16,13 @@ import Sidebar from '../../components/common/Sidebar';
 import { colors } from '../../styles/colors';
 import { spacing } from '../../styles/spacing';
 import { typography } from '../../styles/typography';
-import * as LucideIcons from 'lucide-react';
-import { Bell, CheckCircle2, Clock, Plus, X } from 'lucide-react';
+import { 
+    Bell, CheckCircle2, Clock, Plus, X, Pill, Heart, Smile, Activity, ShieldCheck,
+    Calendar, ChevronRight, TrendingUp, Utensils, HeartPulse, Mic, User, Check 
+} from 'lucide-react';
+import { subscribeToTasks, subscribeToDailyLogs, toggleTaskCompletion } from '../../services/taskService';
+import { listenToAlerts } from '../../services/alertService';
+import CaretakerSidePanel from './CaretakerSidePanel';
 
 export default function CaretakerDashboard() {
     const navigate = useNavigate();
@@ -30,13 +35,10 @@ export default function CaretakerDashboard() {
     const [alertCount, setAlertCount] = useState(0);
 
     // Bottom Sheets
-    const [selectedTask, setSelectedTask] = useState(null);
-    const [showConfirmSheet, setShowConfirmSheet] = useState(false);
-    const [showNoteSheet, setShowNoteSheet] = useState(false);
-    const [taskNote, setTaskNote] = useState('');
-    const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState(null);
     const [humanPatientId, setHumanPatientId] = useState('');
+
+    const [patientInfo, setPatientInfo] = useState({ name: '', allergies: 'None', lastShiftSummary: '' });
 
     // For unlinked caretaker inline linking
     const [linkIdInput, setLinkIdInput] = useState('');
@@ -81,10 +83,16 @@ export default function CaretakerDashboard() {
             try {
                 const patDoc = await getDoc(doc(db, 'patients', patientId));
                 if (patDoc.exists()) {
-                    setHumanPatientId(patDoc.data().patientId || '');
+                    const pData = patDoc.data();
+                    setHumanPatientId(pData.patientId || '');
+                    setPatientInfo({
+                        name: pData.name,
+                        allergies: pData.allergies || 'None',
+                        lastShiftSummary: pData.lastShiftSummary || "Patient is stable. No incidents reported."
+                    });
                 }
             } catch (err) {
-                console.error('Could not fetch patient humanId', err);
+                console.error('Could not fetch patient info', err);
             }
         };
         fetchHumanId();
@@ -115,225 +123,160 @@ export default function CaretakerDashboard() {
         setLinking(false);
     };
 
-    // 2. Real-time Listening to Today's Tasks & Alerts
+    const [tasks, setTasks] = useState([]);
+    const [completions, setCompletions] = useState({});
+
+    // Real-time synchronization
     useEffect(() => {
         if (!patientId) return;
 
-        setLoading(true);
-        const todayString = getTodayDateString();
-
-        const qLogs = query(collection(db, 'dailyLogs'), where('patientId', '==', patientId), where('date', '==', todayString));
-
-        const unsubLogs = onSnapshot(qLogs, async (snapshot) => {
-            if (snapshot.empty) {
-                // Auto-generate today's log from carePlans if it doesn't exist to simulate the midnight Cloud Function
-                try {
-                    const planDoc = await getDoc(doc(db, 'carePlans', patientId));
-                    if (planDoc.exists()) {
-                        const plan = planDoc.data();
-                        const defaultTasks = [
-                            ...(plan.medicines || []).map(m => ({
-                                taskId: `med-${m.medicineId || Date.now()}`,
-                                name: `${m.name} (${m.dosage})`,
-                                icon: 'Pill',
-                                scheduledTime: m.scheduledTimes?.[0] || '12:00',
-                                status: 'Pending',
-                                isCritical: false
-                            })),
-                            ...(plan.tasks || []).map(t => ({
-                                taskId: t.taskId || `task-${Date.now()}`,
-                                name: t.name,
-                                icon: t.icon || 'Activity',
-                                scheduledTime: t.scheduledTime || '12:00',
-                                status: 'Pending',
-                                isCritical: t.isCritical || false
-                            }))
-                        ];
-
-                        const newLogRef = doc(collection(db, 'dailyLogs'));
-                        await setDoc(newLogRef, {
-                            patientId,
-                            date: todayString,
-                            tasks: defaultTasks,
-                            completedTasks: 0,
-                            totalTasks: defaultTasks.length,
-                            careScore: 0
-                        });
-                        // onSnapshot will re-fire on this insertion
-                    } else {
-                        setData({ id: 'dummy', tasks: [], completedTasks: 0, totalTasks: 0 });
-                        setLoading(false);
-                    }
-                } catch (err) {
-                    console.error("Error generating daily log:", err);
-                    setError("Failed to initialize today's schedule.");
-                    setLoading(false);
-                }
-            } else {
-                const docSnap = snapshot.docs[0];
-                setData({ id: docSnap.id, ...docSnap.data() });
-                setLoading(false);
-            }
-        }, (err) => {
-            console.error(err);
-            setError("Failed to load today's schedule.");
+        // Safety: If data loading hangs for too long, just show what we have (or empty state)
+        const dashboardTimeout = setTimeout(() => {
+            console.warn("[Dashboard] Data subscription timed out. Forcing loading false.");
             setLoading(false);
+        }, 3000);
+
+        const unsubTasks = subscribeToTasks(patientId, (allTasks) => {
+            setTasks(allTasks);
+            setLoading(false);
+            clearTimeout(dashboardTimeout);
         });
 
-        // Sub to active alerts to show badge
-        const qAlerts = query(collection(db, 'alerts'), where('patientId', '==', patientId));
-        const unsubAlerts = onSnapshot(qAlerts, (snap) => {
-            setAlertCount(snap.docs.length); // Simplified length count for UI
+        const unsubLogs = subscribeToDailyLogs(patientId, (dailyCompletions) => {
+            setCompletions(dailyCompletions);
+        });
+
+        const unsubAlerts = listenToAlerts(patientId, (fetchedAlerts) => {
+            const unreadCount = fetchedAlerts.filter(a => !a.isRead).length;
+            setAlertCount(unreadCount);
         });
 
         return () => {
+            unsubTasks();
             unsubLogs();
             unsubAlerts();
+            clearTimeout(dashboardTimeout);
         };
     }, [patientId]);
 
-    // Handle Complete Task
-    const confirmCompletion = async () => {
-        setSubmitting(true);
+    const totalCount = tasks.length;
+    const completedCount = tasks.filter(t => completions[t.id]?.completed).length;
+    const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+    const handleTaskCheck = async (taskId, currentStatus) => {
         try {
-            const logRef = doc(db, 'dailyLogs', data.id);
-            const updatedTasks = data.tasks.map(t => {
-                if (t.taskId === selectedTask.taskId) {
-                    return { ...t, status: 'Completed', completedAt: new Date().toISOString() };
-                }
-                return t;
-            });
-
-            const completedCount = updatedTasks.filter(t => t.status === 'Completed').length;
-
-            await updateDoc(logRef, {
-                tasks: updatedTasks,
-                completedTasks: completedCount
-            });
-
-            showToast(`Task completed!`, 'success');
-            setShowConfirmSheet(false);
-            setSelectedTask(null);
+            await toggleTaskCompletion(patientId, taskId, user.uid, !currentStatus);
+            showToast(currentStatus ? "Entry removed" : "Task logged successfully", 'success');
         } catch (err) {
-            console.error(err);
-            showToast('Failed to complete task.', 'error');
+            showToast("Failed to update task", 'error');
         }
-        setSubmitting(false);
     };
 
-    // Handle Add Note
-    const saveTaskNote = async () => {
-        setSubmitting(true);
-        try {
-            const logRef = doc(db, 'dailyLogs', data.id);
-            const updatedTasks = data.tasks.map(t => {
-                if (t.taskId === selectedTask.taskId) {
-                    return { ...t, note: taskNote };
-                }
-                return t;
-            });
-
-            await updateDoc(logRef, { tasks: updatedTasks });
-            showToast('Note added securely.', 'success');
-            setShowNoteSheet(false);
-            setSelectedTask(null);
-            setTaskNote('');
-        } catch (err) {
-            console.error(err);
-            showToast('Failed to add note.', 'error');
-        }
-        setSubmitting(false);
-    };
-
-    // Long Press handlers
-    const handlePressStart = (task) => {
-        if (task.status === 'Completed') return; // Only notes on pending? Or allow on completed? Allow!
-        pressTimer.current = setTimeout(() => {
-            setSelectedTask(task);
-            setTaskNote(task.note || '');
-            setShowNoteSheet(true);
-        }, 600);
-    };
-
-    const handlePressEnd = () => {
-        if (pressTimer.current) clearTimeout(pressTimer.current);
-    };
-
-    // Renders
     const renderTask = (task) => {
-        const isCompleted = task.status === 'Completed';
-        const IconComponent = LucideIcons[task.icon] || LucideIcons.Activity;
+        const isDone = completions[task.id]?.completed;
+        const catColorMap = {
+            'Medication': { bg: colors.lightBlue, text: colors.primaryBlue },
+            'Vitals Monitoring': { bg: '#F3E8FF', text: '#8B5CF6' },
+            'Nutrition': { bg: colors.lightGreen, text: colors.primaryGreen }
+        };
+        const catStyle = catColorMap[task.category] || { bg: '#F1F5F9', text: '#475569' };
 
         return (
-            <Card
-                key={task.taskId}
-                onClick={() => {
-                    if (!isCompleted && !showNoteSheet && !showConfirmSheet) {
-                        setSelectedTask(task);
-                        setShowConfirmSheet(true);
-                    }
+            <div 
+                key={task.id} 
+                onClick={() => handleTaskCheck(task.id, isDone)}
+                style={{ 
+                    display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderRadius: '12px',
+                    backgroundColor: isDone ? '#F0FDF4' : colors.white, 
+                    border: `1.5px solid ${isDone ? '#BBF7D0' : '#E2E8F0'}`,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: isDone ? 'none' : '0 2px 4px rgba(0,0,0,0.02)',
                 }}
-                onPointerDown={() => handlePressStart(task)}
-                onPointerUp={handlePressEnd}
-                onPointerLeave={handlePressEnd}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    opacity: isCompleted ? 0.6 : 1,
-                    marginBottom: '12px'
-                }}
+                className="task-card-hover"
             >
-                <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    backgroundColor: colors.lightBlue,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
+                <div style={{ 
+                    width: '26px', height: '26px', borderRadius: '8px', flexShrink: 0,
+                    border: `2.5px solid ${isDone ? '#10B981' : '#CBD5E1'}`,
+                    backgroundColor: isDone ? '#10B981' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.2s'
                 }}>
-                    <IconComponent size={20} color={colors.primaryBlue} />
+                    {isDone && <Check size={16} color="white" strokeWidth={3} />}
                 </div>
-
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <span style={{
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        color: colors.textPrimary,
-                        textDecoration: isCompleted ? 'line-through' : 'none'
-                    }}>
-                        {task.name}
-                    </span>
-                    <span style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock size={12} /> {task.scheduledTime}
-                        {task.note && <span style={{ marginLeft: '6px', color: colors.primaryBlue, fontStyle: 'italic' }}>• Note added</span>}
-                    </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <h4 style={{ fontSize: '15px', fontWeight: '800', color: isDone ? '#065F46' : colors.textPrimary, textDecoration: isDone ? 'line-through' : 'none', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</h4>
+                        <span style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px', backgroundColor: catStyle.bg, color: catStyle.text, fontWeight: '800', whiteSpace: 'nowrap' }}>{task.category}</span>
+                    </div>
+                    {task.time && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: colors.textSecondary }}><Clock size={12} /><span style={{ fontSize: '12px', fontWeight: '700' }}>{task.time}</span></div>}
                 </div>
+            </div>
+        );
+    };
 
-                <div>
-                    {isCompleted ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: colors.successGreen, padding: '4px 8px', borderRadius: '8px' }}>
-                            <CheckCircle2 size={14} color={colors.primaryGreen} />
-                            <span style={{ fontSize: '10px', color: colors.primaryGreen, fontWeight: '600' }}>Done</span>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: colors.lightOrange, padding: '4px 8px', borderRadius: '8px', border: `1px solid ${colors.alertOrange}` }}>
-                            <span style={{ fontSize: '10px', color: colors.alertOrange, fontWeight: '600' }}>Pending</span>
-                        </div>
-                    )}
+    const getGroupedTasks = () => {
+        const morning = [], afternoon = [], evening = [];
+        [...tasks].sort((a,b) => (a.time || '').localeCompare(b.time || '')).forEach(t => {
+            if (!t.time || t.time === 'As needed') { morning.push(t); return; }
+            const hour = parseInt(t.time.split(':')[0], 10);
+            if (hour < 12) morning.push(t);
+            else if (hour < 17) afternoon.push(t);
+            else evening.push(t);
+        });
+        return { morning, afternoon, evening };
+    };
+
+    const groupedTasks = getGroupedTasks();
+
+    const renderTaskGroup = (title, groupTasks) => {
+        if (groupTasks.length === 0) return null;
+        return (
+            <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {title} <div style={{ flex: 1, height: '1px', backgroundColor: colors.border }}></div>
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+                    {groupTasks.map(renderTask)}
+                </div>
+            </div>
+        );
+    };
+
+    const ProgressGauge = ({ completed, total }) => {
+        const percentage = (completed / total) * 100;
+        const radius = 60;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percentage / 100) * circumference;
+
+        return (
+            <Card style={{ 
+                padding: '24px', display: 'flex', alignItems: 'center', gap: '24px', 
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #F0FDF4 100%)' 
+            }}>
+                <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+                    <svg width="120" height="120" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="70" cy="70" r={radius} fill="transparent" stroke="#E2E8F0" strokeWidth="10" />
+                        <circle 
+                            cx="70" cy="70" r={radius} fill="transparent" 
+                            stroke="#10B981" strokeWidth="10" strokeDasharray={circumference} 
+                            strokeDashoffset={offset} strokeLinecap="round" 
+                        />
+                    </svg>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                        <span style={{ fontSize: '24px', fontWeight: '800' }}>{completed}/{total}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>TASKS</span>
+                    </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: '800', color: colors.textPrimary, marginBottom: '4px' }}>Today's Progress</h3>
+                    <p style={{ fontSize: '14px', color: colors.textSecondary }}>You've completed {percentage}% of scheduled tasks.</p>
                 </div>
             </Card>
         );
     };
 
-    const completedCount = data?.completedTasks || 0;
-    const totalCount = data?.totalTasks || 0;
-    const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-    const pendingTasks = data?.tasks?.filter(t => t.status !== 'Completed') || [];
-    const completedTasks = data?.tasks?.filter(t => t.status === 'Completed') || [];
+    const pendingTasks = tasks.filter(t => !completions[t.id]?.completed);
+    const completedTasks = tasks.filter(t => completions[t.id]?.completed);
 
     const sidebarItems = [
         { icon: 'Home', label: 'Dashboard', path: '/caretaker/dashboard' },
@@ -341,12 +284,27 @@ export default function CaretakerDashboard() {
         { icon: 'Clipboard', label: 'Observations', path: '/caretaker/observations' },
         { icon: 'Bell', label: 'Alerts', path: '/caretaker/alerts' },
         { icon: 'Clock', label: 'Shift Handover', path: '/caretaker/handover' },
+        { icon: 'MessageSquare', label: 'Messages', path: '/caretaker/messages' },
     ];
 
     return (
-        <div className="desktop-layout" style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div className="desktop-layout" style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'row', position: 'relative' }}>
             <Sidebar navItems={sidebarItems} />
             <div className="desktop-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0 }}>
+                
+                <ScreenHeader
+                    title={`Good Morning, ${firstName}`}
+                    rightIcon={
+                        <div style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => navigate('/caretaker/alerts')}>
+                            <Bell size={20} color={colors.textPrimary} />
+                            {alertCount > 0 && (
+                                <span style={{ position: 'absolute', top: '-4px', right: '-4px', backgroundColor: colors.alertRed, color: colors.white, fontSize: '10px', fontWeight: 'bold', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {alertCount}
+                                </span>
+                            )}
+                        </div>
+                    }
+                />
 
 
                 {toast && (
@@ -360,179 +318,206 @@ export default function CaretakerDashboard() {
                     </div>
                 )}
 
-                {/* TopHeader */}
-                <div className="top-header">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                        <div style={{ fontSize: typography.sectionHeading.fontSize, fontWeight: typography.sectionHeading.fontWeight, color: colors.textPrimary }}>
-                            Good Morning, {firstName}
-                        </div>
-                        {humanPatientId && (
-                            <span style={{ fontSize: '11px', color: colors.textSecondary, backgroundColor: colors.background, padding: '2px 8px', borderRadius: '20px', display: 'inline-block', fontWeight: '500', border: `1px solid ${colors.border}` }}>
-                                Patient ID: {humanPatientId}
-                            </span>
-                        )}
-                    </div>
-                    <div style={{ position: 'relative', cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => navigate('/caretaker/alerts')}>
-                        <Bell size={22} color={colors.textPrimary} />
-                        {alertCount > 0 && (
-                            <span style={{ position: 'absolute', top: '6px', right: '4px', backgroundColor: colors.alertRed, color: colors.white, fontSize: '10px', fontWeight: 'bold', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {alertCount}
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {/* Unlinked State */}
-                {!loading && !patientId && (
-                    <div style={{ padding: spacing.pagePadding, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '24px' }}>
-                        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <span style={{ fontSize: '40px' }}>🔗</span>
-                            <h2 style={{ fontSize: '18px', fontWeight: '700', color: colors.textPrimary }}>You are not linked to any patient yet.</h2>
-                            <p style={{ fontSize: '14px', color: colors.textSecondary, lineHeight: '1.6', maxWidth: '300px' }}>
-                                Ask the family for the Patient ID and enter it below to get started.
-                            </p>
-                        </div>
-                        <div style={{ width: '100%', maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <InputField
-                                label="Patient ID"
-                                placeholder="e.g. CL-2026-4729"
-                                value={linkIdInput}
-                                onChange={(e) => { setLinkIdInput(e.target.value.toUpperCase()); setLinkError(''); }}
-                            />
-                            {linkError && (
-                                <div style={{ backgroundColor: '#FEF2F2', padding: '10px 14px', borderRadius: '8px', border: `1px solid ${colors.alertRed}` }}>
-                                    <span style={{ fontSize: '13px', color: colors.alertRed, fontWeight: '500' }}>{linkError}</span>
-                                </div>
-                            )}
-                            <PrimaryButton label={linking ? 'Linking…' : 'Link to Patient'} onClick={handleLinkPatient} isLoading={linking} disabled={linking || !linkIdInput} />
-                        </div>
-                    </div>
-                )}
-
-                <div className="main-content scroll-y" style={{ padding: spacing.pagePadding }}>
-                    <p style={{ fontSize: '14px', color: colors.textSecondary, marginBottom: '16px' }}>{formatDisplayDate(getTodayDateString())}</p>
-
-                    {error && <ErrorCard message={error} />}
-
-                    {loading && !error && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <SkeletonCard style={{ height: '80px' }} />
-                            <SkeletonCard style={{ height: '100px' }} />
-                            <SkeletonCard style={{ height: '100px' }} />
+                {/* Main Dashboard Content */}
+                <div 
+                    className="main-content scroll-y" 
+                    style={{ 
+                        padding: 'calc(var(--header-h) + 24px + env(safe-area-inset-top)) 20px 100px 20px', 
+                        flex: 1, 
+                        overflowY: 'auto' 
+                    }}
+                >
+                    {/* Unlinked State */}
+                    {!loading && !patientId && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '24px' }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <ShieldCheck size={48} color={colors.primaryBlue} style={{ marginBottom: '16px' }} />
+                                <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.textPrimary }}>Patient Linking Required</h2>
+                                <p style={{ fontSize: '14px', color: colors.textSecondary, maxWidth: '320px', margin: '8px auto' }}>
+                                    Enter the Patient ID provided by the family to access the care dashboard.
+                                </p>
+                            </div>
+                            <div style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <InputField
+                                    placeholder="Enter Patient ID (e.g. CL-2026-XXXX)"
+                                    value={linkIdInput}
+                                    onChange={(e) => setLinkIdInput(e.target.value.toUpperCase())}
+                                />
+                                <PrimaryButton label={linking ? "Linking..." : "Link Profile"} onClick={handleLinkPatient} disabled={linking} />
+                            </div>
                         </div>
                     )}
 
-                    {!loading && !error && data && (
-                        <>
-                            {/* Progress Card */}
-                            <Card style={{ marginBottom: spacing.gapBetweenSections }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                    <span style={{ fontSize: '14px', fontWeight: '600', color: colors.textPrimary }}>Today's Tasks</span>
-                                    <span style={{ fontSize: '14px', color: colors.textSecondary }}>{completedCount} of {totalCount} completed</span>
-                                </div>
-                                <div style={{ width: '100%', height: '8px', backgroundColor: colors.background, borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${progressPercent}%`, height: '100%', backgroundColor: colors.primaryBlue, transition: 'width 0.5s ease-out' }} />
-                                </div>
-                            </Card>
-
-                            {/* Tasks List */}
-                            <div className="caretaker-grid">
-                                <div>
-                                    {data.tasks?.length === 0 ? (
-                                        <div style={{ textAlign: 'center', padding: '32px 16px', color: colors.textSecondary, fontSize: '14px' }}>
-                                            No tasks scheduled for today.
+                    {patientId && (
+                        <div className="caretaker-responsive-grid">
+                            <div className="caretaker-main-col">
+                                {/* Header Summary */}
+                                <div style={{ 
+                                    backgroundColor: colors.white, padding: '24px', borderRadius: '16px', 
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' 
+                                }}>
+                                    <div>
+                                        <h1 style={{ fontSize: '28px', fontWeight: '900', color: colors.textPrimary, letterSpacing: '-0.5px', marginBottom: '4px' }}>{loading ? "..." : patientInfo.name}</h1>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '800', color: colors.primaryBlue, backgroundColor: colors.lightBlue, padding: '4px 10px', borderRadius: '6px' }}>{humanPatientId}</span>
+                                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#991B1B', textTransform: 'uppercase' }}>Allergies: {patientInfo.allergies}</span>
                                         </div>
-                                    ) : (
-                                        <div style={{ paddingBottom: '80px' }}>
-                                            {pendingTasks.map(renderTask)}
-                                            {completedTasks.length > 0 && (
-                                                <>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: colors.textSecondary, marginTop: '24px', marginBottom: '12px' }}>Completed</div>
-                                                    {completedTasks.map(renderTask)}
-                                                </>
-                                            )}
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: colors.textSecondary }}>
+                                            <Calendar size={14} />
+                                            <span style={{ fontSize: '13px', fontWeight: '600' }}>{formatDisplayDate(getTodayDateString())}</span>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
 
-                                <div className="desktop-only" style={{ flexDirection: 'column' }}>
-                                    <Card style={{ padding: '24px' }}>
-                                        <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>Quick Vitals Entry</h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                            <InputField placeholder="BP Systolic (e.g. 120)" />
-                                            <InputField placeholder="BP Diastolic (e.g. 80)" />
-                                            <InputField placeholder="Heart Rate (bpm)" />
-                                            <InputField placeholder="Temperature (F)" />
-                                            <PrimaryButton label="Open Full Vitals Entry" onClick={() => navigate('/caretaker/vitals')} />
+                                {/* Progress & Summary Section */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+                                    <Card style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '20px', backgroundColor: '#F0F9FF', border: 'none', height: '100%' }}>
+                                        <div style={{ position: 'relative', width: '64px', height: '64px' }}>
+                                            <svg width="64" height="64" viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
+                                                <circle cx="40" cy="40" r="32" fill="transparent" stroke="#E2E8F0" strokeWidth="6" />
+                                                <circle 
+                                                    cx="40" cy="40" r="32" fill="transparent" 
+                                                    stroke={colors.primaryBlue} strokeWidth="6" 
+                                                    strokeDasharray={2 * Math.PI * 32} 
+                                                    strokeDashoffset={(2 * Math.PI * 32) - (progressPercent / 100) * (2 * Math.PI * 32)} 
+                                                    strokeLinecap="round" 
+                                                />
+                                            </svg>
+                                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '14px', fontWeight: '900', color: colors.primaryBlue }}>{Math.round(progressPercent)}%</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0369A1', marginBottom: '2px' }}>Day Completion</h4>
+                                            <p style={{ fontSize: '12px', color: '#0C4A6E', opacity: 0.8 }}>{completedCount} of {totalCount} tasks verified</p>
                                         </div>
                                     </Card>
+
+                                    <Card style={{ padding: '20px', height: '100%', backgroundColor: colors.white }}>
+                                        <h4 style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Latest Handover</h4>
+                                        <p style={{ fontSize: '13px', color: colors.textPrimary, fontStyle: 'italic', lineHeight: '1.5', opacity: 0.8 }}>
+                                            "{loading ? "..." : (patientInfo.lastShiftSummary ? patientInfo.lastShiftSummary.substring(0, 100) : "No handover yet")}"
+                                        </p>
+                                    </Card>
+                                </div>
+
+                                {/* Main Task List */}
+                                <div style={{ backgroundColor: colors.white, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}` }}>
+                                    <h3 style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary, marginBottom: '24px' }}>Prescribed Care Checklist</h3>
+                                    <div>
+                                        {loading ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+                                                {[1, 2, 3, 4].map(i => <SkeletonCard key={i} style={{ height: '72px' }} />)}
+                                            </div>
+                                        ) : tasks.length > 0 ? (
+                                            <>
+                                                {renderTaskGroup('Morning', groupedTasks.morning)}
+                                                {renderTaskGroup('Afternoon', groupedTasks.afternoon)}
+                                                {renderTaskGroup('Evening', groupedTasks.evening)}
+                                            </>
+                                        ) : (
+                                            <div style={{ textAlign: 'center', padding: '40px', border: `1px dashed ${colors.border}`, borderRadius: '12px' }}>
+                                                <p style={{ color: colors.textSecondary, fontWeight: '600' }}>No active tasks scheduled.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Quick Access Actions Grid */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                                    {/* Shift Status */}
+                                <div style={{ backgroundColor: '#ECFDF5', padding: '20px', borderRadius: '16px', border: '1.5px solid #A7F3D0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                                        <div style={{ padding: '8px', backgroundColor: '#A7F3D0', borderRadius: '8px' }}>
+                                            <Clock size={16} color="#065F46" />
+                                        </div>
+                                        <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#065F46' }}>Shift Management</h4>
+                                    </div>
+                                    <button 
+                                        onClick={() => navigate('/caretaker/handover')}
+                                        style={{ 
+                                            width: '100%', height: '44px', backgroundColor: '#10B981', color: 'white', 
+                                            borderRadius: '10px', border: 'none', fontWeight: '800', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                        }}
+                                    >
+                                        Log Handover
+                                    </button>
+                                </div>
+
+                                {/* Vital Signs Summary */}
+                                <Card style={{ padding: '20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                        <h3 style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <HeartPulse size={16} color={colors.primaryBlue} /> Vital Signs
+                                        </h3>
+                                        <button onClick={() => navigate('/caretaker/vitals')} style={{ background: 'none', border: 'none', color: colors.primaryBlue, fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>Update</button>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                        <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '10px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '10px', fontWeight: '800', color: colors.textSecondary, marginBottom: '4px' }}>BP</p>
+                                            <p style={{ fontSize: '15px', fontWeight: '900', color: colors.textPrimary }}>120/80</p>
+                                        </div>
+                                        <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '10px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '10px', fontWeight: '800', color: colors.textSecondary, marginBottom: '4px' }}>HR</p>
+                                            <p style={{ fontSize: '15px', fontWeight: '900', color: colors.textPrimary }}>72 bpm</p>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                {/* Observations Activity */}
+                                <Card style={{ padding: '20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                        <h3 style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Mic size={16} color={colors.primaryBlue} /> Observations
+                                        </h3>
+                                    </div>
+                                    <button 
+                                        onClick={() => navigate('/caretaker/observations')}
+                                        style={{ 
+                                            width: '100%', height: '44px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '10px', 
+                                            color: colors.textPrimary, fontWeight: '800', fontSize: '13px', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                        }}
+                                    >
+                                        <Mic size={14} /> Start Voice Log
+                                    </button>
+                                </Card>
+
+                                {/* Clinical Alert Box */}
+                                <div style={{ backgroundColor: '#FFF7ED', padding: '20px', borderRadius: '16px', border: '1px solid #FFEDD5' }}>
+                                    <h4 style={{ fontSize: '13px', fontWeight: '900', color: '#9A3412', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                                        <Bell size={14} /> Care Instructions
+                                    </h4>
+                                    <p style={{ fontSize: '12px', color: '#9A3412', lineHeight: '1.6', fontWeight: '500' }}>
+                                        Check temperature every 4 hours if fever persists. Administer paracetamol as per SOS instructions.
+                                    </p>
+                                </div>
                                 </div>
                             </div>
-                        </>
+
+                            {/* Right Column: Unified Side Panel (1/3 width) */}
+                            <div className="caretaker-side-col">
+                                <CaretakerSidePanel />
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* FAB */}
-            <div
-                className="mobile-only"
-                onClick={() => navigate('/caretaker/vitals')}
-                style={{
-                    position: 'fixed', bottom: 'calc(80px + env(safe-area-inset-bottom))', right: '16px', width: '56px', height: '56px',
-                    borderRadius: '50%', backgroundColor: colors.primaryBlue, boxShadow: spacing.shadows.button,
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', zIndex: 999
-                }}
-            >
-                <Plus size={28} color={colors.white} />
-            </div>
-
-            <div className="mobile-only">
-                <CaretakerBottomNav />
-            </div>
-
-            {/* Confirmation Bottom Sheet */}
-            {
-                showConfirmSheet && selectedTask && (
-                    <div className="bottom-sheet-overlay" style={{ animation: 'fadeIn 0.2s' }}>
-                        <div className="bottom-sheet" style={{ padding: spacing.pagePadding, paddingBottom: 'calc(32px + env(safe-area-inset-bottom))', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-                            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', textAlign: 'center' }}>Mark "{selectedTask.name}" as complete?</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <PrimaryButton label="Confirm" onClick={confirmCompletion} isLoading={submitting} disabled={submitting} />
-                                <SecondaryButton label="Cancel" onClick={() => setShowConfirmSheet(false)} disabled={submitting} />
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Note Bottom Sheet */}
-            {
-                showNoteSheet && selectedTask && (
-                    <div className="bottom-sheet-overlay" style={{ animation: 'fadeIn 0.2s' }}>
-                        <div className="bottom-sheet" style={{ padding: spacing.pagePadding, paddingBottom: 'calc(32px + env(safe-area-inset-bottom))', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Add Note</h3>
-                                <button onClick={() => setShowNoteSheet(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={24} color={colors.textSecondary} /></button>
-                            </div>
-                            <p style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '12px' }}>Attaching note to: {selectedTask.name}</p>
-                            <InputField
-                                placeholder="E.g. Patient felt slightly nauseous."
-                                value={taskNote}
-                                onChange={(e) => setTaskNote(e.target.value)}
-                            />
-                            <div style={{ marginTop: '24px' }}>
-                                <PrimaryButton label="Save Note" onClick={saveTaskNote} isLoading={submitting} disabled={submitting || !taskNote} />
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
             <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        @keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 20px; opacity: 1; } }
-      `}</style>
-        </div >
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+                @keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 20px; opacity: 1; } }
+                
+                .card-hover:hover {
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+                    transform: translateY(-1px);
+                }
+            `}</style>
+
+        </div>
     );
 }

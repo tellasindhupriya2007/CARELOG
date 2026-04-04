@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import TopHeader from '../common/TopHeader';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import InputField from '../common/InputField';
 import PrimaryButton from '../common/PrimaryButton';
 import SecondaryButton from '../common/SecondaryButton';
@@ -134,7 +134,7 @@ export default function RegisterScreen() {
     return (
         <div className="auth-desktop-container" style={{ backgroundColor: colors.background, minHeight: '100vh' }}>
             <div className="auth-desktop-card" style={{ backgroundColor: colors.white, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-                <TopHeader title="Create Account" showBack onBack={() => navigate(-1)} />
+                <ScreenHeader title="Create Account" showBack onBack={() => navigate(-1)} />
 
                 <div style={{ padding: spacing.pagePadding, flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <p style={{ color: colors.textSecondary, marginBottom: '4px' }}>

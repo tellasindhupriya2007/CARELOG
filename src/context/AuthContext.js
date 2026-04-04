@@ -21,11 +21,20 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const startTime = Date.now();
 
+        // ── 1. Safety Timeout ──────────────────────────────
+        // If Firebase/Firestore fails to respond within 5s,
+        // force clear the splash screen so the app remains usable.
+        const safetyTimer = setTimeout(() => {
+            console.warn("[Auth] Auth check timed out. Forcing loading false.");
+            setLoading(false);
+        }, 5000);
+
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 setUser(firebaseUser);
                 setPhotoURL(firebaseUser.photoURL || null);
                 try {
+                    // Fetch profile from Firestore with a short "abandon" timer
                     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
@@ -33,13 +42,11 @@ export const AuthProvider = ({ children }) => {
                         setPatientId(userData.patientId || userData.assignedPatientId || null);
                         if (userData.photoURL) setPhotoURL(userData.photoURL);
                     } else {
-                        // Edge case: user exists in Firebase Auth but not in Firestore
-                        // Don't clear role — the signInWithGoogle function handles document creation
                         setRole(null);
                         setPatientId(null);
                     }
                 } catch (error) {
-                    console.error("Error fetching user data:", error);
+                    console.error("[Auth] Error fetching user profile:", error);
                     setRole(null);
                     setPatientId(null);
                 }
@@ -51,14 +58,19 @@ export const AuthProvider = ({ children }) => {
             }
 
             const timeElapsed = Date.now() - startTime;
-            if (timeElapsed < 1500) {
-                setTimeout(() => setLoading(false), 1500 - timeElapsed);
+            clearTimeout(safetyTimer);
+            
+            if (timeElapsed < 1200) {
+                setTimeout(() => setLoading(false), 1200 - timeElapsed);
             } else {
                 setLoading(false);
             }
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            clearTimeout(safetyTimer);
+        };
     }, []);
 
     /**
@@ -107,6 +119,35 @@ export const AuthProvider = ({ children }) => {
                 userPatientId: null
             };
         }
+    };
+
+    /**
+     * Development Mode Login.
+     * Bypasses Google/Firebase auth for rapid testing.
+     * @param {string} devRole - family/caretaker/doctor
+     */
+    const devLogin = async (devRole) => {
+        const mockUid = `dev-${devRole}`;
+        const mockUser = {
+            uid: mockUid,
+            displayName: `Dev ${devRole.charAt(0).toUpperCase() + devRole.slice(1)}`,
+            email: `${devRole}@dev.carelog`,
+            photoURL: `https://ui-avatars.com/api/?name=Dev+${devRole}&background=random`
+        };
+
+        setUser(mockUser);
+        setRole(devRole);
+        
+        // Mock patient ID for testing
+        const mockPatientId = 'DEV-PATIENT-001';
+        setPatientId(mockPatientId);
+        setPhotoURL(mockUser.photoURL);
+
+        return {
+            isNewUser: false,
+            userRole: devRole,
+            userPatientId: mockPatientId
+        };
     };
 
     const logout = async () => {
@@ -169,7 +210,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{
             user, role, patientId, photoURL,
-            setPatientId, signInWithGoogle, logout, setRoleAndPatient
+            setPatientId, signInWithGoogle, logout, setRoleAndPatient, devLogin
         }}>
             {children}
         </AuthContext.Provider>

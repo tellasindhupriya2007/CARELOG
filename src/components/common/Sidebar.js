@@ -1,11 +1,19 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthContext } from '../../context/AuthContext';
 import { colors } from '../../styles/colors';
 import * as LucideIcons from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 export default function Sidebar({ navItems }) {
     const navigate = useNavigate();
+    const { logout } = useAuthContext();
     const location = useLocation();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/auth/splash', { replace: true });
+    };
 
     return (
         <div className="sidebar">
@@ -56,6 +64,26 @@ export default function Sidebar({ navItems }) {
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Logout Button */}
+            <div style={{ marginTop: 'auto', borderTop: `1px solid ${colors.border}`, paddingTop: '16px' }}>
+                <div
+                    onClick={handleLogout}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        color: colors.alertRed,
+                    }}
+                >
+                    <LogOut size={20} color={colors.alertRed} />
+                    <span style={{ fontSize: '15px', fontWeight: '600' }}>Log Out</span>
+                </div>
             </div>
         </div>
     );

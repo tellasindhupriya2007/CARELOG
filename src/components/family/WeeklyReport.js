@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuthContext } from '../../context/AuthContext';
-import TopHeader from '../common/TopHeader';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import Card from '../common/Card';
 import PrimaryButton from '../common/PrimaryButton';
 import SkeletonCard from '../common/SkeletonCard';
@@ -364,7 +364,7 @@ export default function WeeklyReport() {
                 </div>
             )}
 
-            <TopHeader
+            <ScreenHeader
                 title="Weekly Report"
                 showBack onBack={() => navigate(-1)}
                 rightIcon={<History size={24} color={colors.textPrimary} style={{ cursor: 'pointer' }} />}

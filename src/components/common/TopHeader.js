@@ -11,7 +11,7 @@ const roleColors = {
     doctor: { bg: '#FFF7ED', color: '#EA580C' },
 };
 
-export default function TopHeader({ title, showBack, onBack, rightIcon }) {
+export default function TopHeader({ title, subtitle, showBack, onBack, rightIcon }) {
     const { user, role, photoURL, logout } = useAuthContext();
     const navigate = useNavigate();
     const [showMenu, setShowMenu] = useState(false);
@@ -126,20 +126,43 @@ export default function TopHeader({ title, showBack, onBack, rightIcon }) {
             </div>
 
             <div style={{
-                fontSize: typography.sectionHeading.fontSize,
-                fontWeight: typography.sectionHeading.fontWeight,
-                color: typography.sectionHeading.color,
-                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
                 flex: 1,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
+                overflow: 'hidden'
             }}>
-                {title}
+                <div style={{
+                    fontSize: typography.sectionHeading.fontSize,
+                    fontWeight: typography.sectionHeading.fontWeight,
+                    color: typography.sectionHeading.color,
+                    textAlign: 'center',
+                    width: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                }}>
+                    {title}
+                </div>
+                {subtitle && (
+                    <div style={{
+                        fontSize: '11px',
+                        color: colors.textSecondary,
+                        textAlign: 'center',
+                        width: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        marginTop: '2px'
+                    }}>
+                        {subtitle}
+                    </div>
+                )}
             </div>
 
-            <div style={{ width: '44px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                {ProfileAvatar}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end' }}>
+                {rightIcon && <div>{rightIcon}</div>}
+                {user && ProfileAvatar}
             </div>
 
             <style>{`

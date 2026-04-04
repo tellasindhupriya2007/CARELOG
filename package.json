@@ -9,12 +9,14 @@
     "@testing-library/user-event": "^13.5.0",
     "firebase": "^12.10.0",
     "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1",
     "react-scripts": "5.0.1",
     "recharts": "^3.8.0",
+    "socket.io-client": "^4.8.3",
     "web-vitals": "^2.1.4",
     "workbox-background-sync": "^6.6.0",
     "workbox-broadcast-update": "^6.6.0",
@@ -30,7 +32,10 @@
     "workbox-streams": "^6.6.0"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "concurrently --names \"CLIENT,SOCKET\" --prefix-colors \"blue,green\" \"react-scripts start\" \"node server/index.js\"",
+    "dev": "concurrently --names \"CLIENT,SOCKET\" --prefix-colors \"blue,green\" \"react-scripts start\" \"node server/index.js\"",
+    "dev:client": "react-scripts start",
+    "dev:server": "node server/index.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -55,6 +60,7 @@
   },
   "devDependencies": {
     "ajv": "^8.18.0",
-    "ajv-keywords": "^5.1.0"
+    "ajv-keywords": "^5.1.0",
+    "concurrently": "^9.2.1"
   }
 }

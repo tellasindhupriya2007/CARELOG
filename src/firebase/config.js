@@ -1,11 +1,8 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
-import { getMessaging } from "firebase/messaging";
+import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// Your web app's Firebase configuration using environment variables
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
     authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -15,16 +12,16 @@ const firebaseConfig = {
     appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Services
 export const auth = getAuth(app);
+
+// Firestore — NO offline persistence (prevents IndexedDB errors in Safari,
+// multiple tabs, and private browsing). The app uses real-time onSnapshot
+// listeners which work perfectly without local caching.
 export const db = getFirestore(app);
-export const messaging = getMessaging(app);
+
 export const storage = getStorage(app);
 
-// Enable offline persistence
-enableIndexedDbPersistence(db).catch((err) => {
-    console.warn("Firebase offline persistence error:", err.code);
-});
+// FCM — not used in this version
+export const messaging = null;

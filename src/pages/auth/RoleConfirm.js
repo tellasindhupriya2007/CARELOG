@@ -13,7 +13,7 @@ const roleConfig = {
 export default function RoleConfirmScreen() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { signInWithGoogle } = useAuthContext();
+    const { signInWithGoogle, devLogin } = useAuthContext();
 
     const selectedRole = location.state?.role || 'family';
     const config = roleConfig[selectedRole] || roleConfig.family;
@@ -26,30 +26,40 @@ export default function RoleConfirmScreen() {
         setError('');
         try {
             const { isNewUser, userRole, userPatientId } = await signInWithGoogle(selectedRole);
-
-            if (!isNewUser) {
-                // Returning user — route by their existing role
-                if (userRole === 'family') navigate('/family/dashboard', { replace: true });
-                else if (userRole === 'caretaker') navigate('/caretaker/dashboard', { replace: true });
-                else if (userRole === 'doctor') navigate('/doctor/dashboard', { replace: true });
-                else navigate('/auth/splash', { replace: true });
-            } else {
-                // New user — route by selected role
-                if (selectedRole === 'family') navigate('/family/onboarding/step-1', { replace: true });
-                else if (selectedRole === 'caretaker') navigate('/caretaker/dashboard', { replace: true });
-                else if (selectedRole === 'doctor') navigate('/doctor/dashboard', { replace: true });
-                else navigate('/auth/splash', { replace: true });
-            }
+            routeUser(isNewUser, userRole, userPatientId);
         } catch (err) {
             console.error('Google Sign In Error:', err);
-            if (err.code === 'auth/popup-closed-by-user') {
-                setError('Sign in was cancelled. Please try again.');
-            } else if (err.code === 'auth/popup-blocked') {
-                setError('Pop-up blocked by browser. Please allow pop-ups for this site.');
-            } else {
-                setError('Sign in failed. Please try again.');
-            }
+            setError('Sign in failed. Please try again.');
+        } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDevSignIn = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const { isNewUser, userRole, userPatientId } = await devLogin(selectedRole);
+            routeUser(isNewUser, userRole, userPatientId);
+        } catch (err) {
+            console.error('Dev Sign In Error:', err);
+            setError('Dev Mode failed.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const routeUser = (isNewUser, userRole, userPatientId) => {
+        if (!isNewUser) {
+            if (userRole === 'family') navigate('/family/dashboard', { replace: true });
+            else if (userRole === 'caretaker') navigate('/caretaker/dashboard', { replace: true });
+            else if (userRole === 'doctor') navigate('/doctor/dashboard', { replace: true });
+            else navigate('/auth/splash', { replace: true });
+        } else {
+            if (selectedRole === 'family') navigate('/family/onboarding/step-1', { replace: true });
+            else if (selectedRole === 'caretaker') navigate('/caretaker/dashboard', { replace: true });
+            else if (selectedRole === 'doctor') navigate('/doctor/dashboard', { replace: true });
+            else navigate('/auth/splash', { replace: true });
         }
     };
 
@@ -137,6 +147,20 @@ export default function RoleConfirmScreen() {
                         <p style={{ fontSize: '12px', color: colors.textSecondary, textAlign: 'center', lineHeight: '1.5' }}>
                             We will never post anything without your permission.
                         </p>
+
+                        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                            <p style={{ fontSize: '12px', fontWeight: '800', color: colors.textSecondary, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔧 Developer Sandbox</p>
+                            <button
+                                onClick={handleDevSignIn}
+                                disabled={loading}
+                                style={{
+                                    width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0',
+                                    backgroundColor: '#F8FAFC', color: '#1E293B', fontWeight: '800', fontSize: '13px', cursor: 'pointer'
+                                }}
+                            >
+                                CONTINUE AS DEV {selectedRole.toUpperCase()}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Back link */}
