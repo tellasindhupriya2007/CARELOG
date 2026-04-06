@@ -76,8 +76,10 @@ export const disconnectSocket = () => {
  * 1. Saves to Firestore (persists regardless of socket state)
  * 2. Emits via Socket.IO for instant delivery if connected
  */
-export const sendMessage = async ({ senderId, senderName, senderRole, receiverId, patientId, message }) => {
-    if (!senderId || !receiverId || !message?.trim()) throw new Error('Invalid message params');
+export const sendMessage = async ({ senderId, senderName, senderRole, receiverId, patientId, message, type = 'text', audioUrl = null, duration = null }) => {
+    if (!senderId || !receiverId) throw new Error('Invalid message params');
+    if (type === 'text' && !message?.trim()) throw new Error('Text message cannot be empty');
+    if (type === 'voice' && !audioUrl) throw new Error('Voice message requires audioUrl');
 
     // 1. Persist to Firestore
     const docRef = await addDoc(collection(db, 'messages'), {
@@ -86,7 +88,10 @@ export const sendMessage = async ({ senderId, senderName, senderRole, receiverId
         senderRole: senderRole || 'unknown',
         receiverId,
         patientId: patientId || null,
-        message: message.trim(),
+        type,
+        message: type === 'text' ? message.trim() : '',
+        audioUrl,
+        duration,
         timestamp: serverTimestamp(),
         isRead: false,
     });
@@ -100,7 +105,10 @@ export const sendMessage = async ({ senderId, senderName, senderRole, receiverId
             senderRole,
             receiverId,
             patientId,
-            message: message.trim(),
+            type,
+            message: type === 'text' ? message.trim() : '',
+            audioUrl,
+            duration,
             timestamp: new Date().toISOString(),
         });
     }

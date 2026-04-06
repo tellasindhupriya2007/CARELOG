@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Users, Bell, FileText, Settings, HeartPulse, LogOut, PieChart, MessageSquare } from 'lucide-react';
+import { useAuthContext } from '../../context/AuthContext';
 import { DS } from './ds';
 
 const iconMap = { Users, Bell, FileText, Settings, PieChart, MessageSquare };
@@ -16,6 +17,7 @@ const items = [
 export default function DoctorShell({ children, alertCount = 0 }) {
     const navigate = useNavigate();
     const { pathname } = useLocation();
+    const { logout } = useAuthContext();
 
     return (
         <div style={{ display: 'flex', height: '100vh', fontFamily: "'Inter', sans-serif", overflow: 'hidden', backgroundColor: DS.surface }}>
@@ -85,7 +87,12 @@ export default function DoctorShell({ children, alertCount = 0 }) {
                         </div>
                     </div>
                     <button
-                        onClick={() => navigate('/auth/splash')}
+                        onClick={async () => {
+                            if (logout) {
+                                await logout();
+                            }
+                            navigate('/auth/splash', { replace: true });
+                        }}
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '12px', border: 'none', background: 'transparent', color: DS.danger, fontSize: '13px', fontWeight: '700', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}
                     >
                         <LogOut size={15} /> Log Out

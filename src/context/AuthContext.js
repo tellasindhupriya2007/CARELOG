@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, limit, query } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { colors } from '../styles/colors';
 import { typography } from '../styles/typography';
@@ -137,9 +137,19 @@ export const AuthProvider = ({ children }) => {
 
         setUser(mockUser);
         setRole(devRole);
-        
-        // Mock patient ID for testing
-        const mockPatientId = 'DEV-PATIENT-001';
+        // Try to fetch a real patient from the database for dev testing
+        let mockPatientId = 'DEV-PATIENT-001';
+        try {
+            const q = query(collection(db, 'patients'), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                mockPatientId = snap.docs[0].id;
+                console.log("[AuthContext] DevLogin using real patient:", mockPatientId);
+            }
+        } catch (err) {
+            console.error("[AuthContext] Failed to load real patient for dev mode", err);
+        }
+
         setPatientId(mockPatientId);
         setPhotoURL(mockUser.photoURL);
 

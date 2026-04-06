@@ -49,6 +49,9 @@ export default function InviteCaretaker() {
         patientId: humanPatientId,       // e.g. CL-2026-4729 — searchable field
         name: patientData.patientName,
         age: parseInt(patientData.age),
+        gender: patientData.gender || 'Other',
+        bloodGroup: patientData.bloodGroup || '',
+        allergies: patientData.allergies || 'None',
         condition: patientData.medicalCondition,
         doctorName: patientData.doctorName || '',
         doctorPhone: patientData.doctorPhone || '',
@@ -58,24 +61,40 @@ export default function InviteCaretaker() {
         createdAt: serverTimestamp()
       });
 
-      // 3. Care Plan collection
-      await setDoc(doc(db, 'carePlans', newDocId), {
-        medicines: medicines.map(m => ({
-          medicineId: m.id,
-          name: m.name,
-          dosage: m.dosage,
-          frequency: m.frequency,
-          scheduledTimes: [m.time]
-        })),
-        tasks: tasks.map(t => ({
-          taskId: t.id,
-          name: t.name,
-          icon: t.icon,
-          scheduledTime: t.time,
-          isCritical: t.isCritical
-        })),
-        vitalsToMonitor: ['bloodPressure', 'heartRate', 'temperature']
+      // 3. Initialize Tasks Subcollection 
+      // Map medicines to Medication Tasks
+      const medicinePromises = medicines.map(m => {
+          return setDoc(doc(collection(db, 'patients', newDocId, 'tasks')), {
+              title: `${m.name} (${m.dosage})`,
+              time: m.time,
+              category: 'Medication',
+              icon: 'Pill',
+              active: true,
+              isCritical: false,
+              createdAt: serverTimestamp()
+          });
       });
+
+      // Map routine tasks to Tasks
+      const taskPromises = tasks.map(t => {
+          let category = 'Routine Check';
+          if (t.icon === 'Utensils') category = 'Nutrition';
+          if (t.icon === 'HeartPulse') category = 'Vitals Monitoring';
+          if (t.icon === 'Activity') category = 'Physical Activity';
+          if (t.icon === 'Moon') category = 'Sleep Routine';
+
+          return setDoc(doc(collection(db, 'patients', newDocId, 'tasks')), {
+              title: t.name,
+              time: t.time,
+              category: category,
+              icon: t.icon || 'Activity',
+              active: true,
+              isCritical: t.isCritical || false,
+              createdAt: serverTimestamp()
+          });
+      });
+
+      await Promise.all([...medicinePromises, ...taskPromises]);
 
       // 4. Update the family user's patientId in their Firestore user doc
       await updateDoc(doc(db, 'users', user.uid), {

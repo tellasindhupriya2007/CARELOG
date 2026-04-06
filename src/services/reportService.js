@@ -7,7 +7,7 @@ import { db } from '../firebase/config';
  * CareLog — Weekly Clinical Report Service
  * Fetches patient bio from Firestore patients collection and includes it in the PDF header.
  */
-export const generateWeeklyReport = async (patientId, patientName) => {
+export const generateWeeklyReport = async (patientId, patientName, action = 'download') => {
     const pdf = new jsPDF();
     const today = new Date();
     const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -179,6 +179,9 @@ export const generateWeeklyReport = async (patientId, patientName) => {
         pdf.text('Confidential Medical Document — CareLog System', 14, pdf.internal.pageSize.height - 8);
     }
 
-    // ── 9. Save ───────────────────────────────────────────────────
+    // ── 9. Save or Return ───────────────────────────────────────────────────
+    if (action === 'dataurl') {
+        return pdf.output('datauristring');
+    }
     pdf.save(`CareLog_Report_${(bio?.name || patientName).replace(/ /g, '_')}_${today.toISOString().split('T')[0]}.pdf`);
 };

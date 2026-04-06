@@ -32,6 +32,7 @@ export default function FamilyDashboard() {
     const [alerts, setAlerts] = useState([]);
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState(null);
 
     // 1. Fetch patient
     useEffect(() => {
@@ -115,17 +116,6 @@ export default function FamilyDashboard() {
         // Calculate and sync Care Score automatically
         calculateAndSaveCareScore(patientId, todayString);
 
-        // Logs listener
-        const logsQuery = query(collection(db, 'dailyLogs'), where('patientId', '==', patientId), where('date', '==', todayString));
-        const unsubLogs = onSnapshot(logsQuery, (snapshot) => {
-            if (!snapshot.empty) {
-                setData(snapshot.docs[0].data());
-            } else {
-                setData({ careScore: 0, tasks: [], completedTasks: 0, totalTasks: 0, vitals: [], observations: [] });
-            }
-            setLoading(false);
-        });
-
         // External Hook Real-time Alerts Listener
         const unsubAlerts = listenToAlerts(patientId, (fetchedAlerts) => {
             // Keep only unread active alerts or top 2
@@ -133,9 +123,64 @@ export default function FamilyDashboard() {
             setAlerts(active);
         });
 
+        const { subscribeToTasks } = require('../../services/taskService');
+        
+        let loadedTasks = [];
+        let loadedCompletions = {};
+        let loadedVitals = [];
+        let loadedObservations = [];
+
+        const unsubTasks = subscribeToTasks(patientId, (allTasks) => {
+            loadedTasks = allTasks;
+            updateLocalData();
+        });
+
+        const qLogs = query(collection(db, 'dailyLogs'), where('patientId', '==', patientId), where('date', '==', todayString));
+        const unsubLogs = onSnapshot(qLogs, (snap) => {
+            if (!snap.empty) {
+                const logData = snap.docs[0].data();
+                loadedCompletions = logData.completions || {};
+                loadedVitals = logData.vitals || [];
+                loadedObservations = logData.observations || [];
+            } else {
+                loadedCompletions = {};
+                loadedVitals = [];
+                loadedObservations = [];
+            }
+            updateLocalData();
+        });
+
+        const updateLocalData = () => {
+            const completedCount = Object.keys(loadedCompletions).length;
+            const totalCount = loadedTasks.length;
+            const taskScore = totalCount > 0 ? (completedCount / totalCount) * 5 : 0;
+            const finalScore = Number((taskScore + 3 + 2).toFixed(1)); // Assuming perfect vitals/obs for now
+            
+            // Map completions back to tasks for timeline rendering
+            const mappedTasks = loadedTasks.map(t => ({
+                ...t,
+                taskId: t.id,
+                name: t.title,
+                status: loadedCompletions[t.id]?.completed ? 'Completed' : 'Pending',
+                completedAt: loadedCompletions[t.id]?.completedAt
+            }));
+
+            setData(prev => ({
+                ...prev,
+                careScore: finalScore,
+                tasks: mappedTasks,
+                completedTasks: completedCount,
+                totalTasks: totalCount,
+                vitals: loadedVitals,
+                observations: loadedObservations 
+            }));
+            setLoading(false);
+        };
+
         return () => {
-            unsubLogs();
             unsubAlerts();
+            unsubTasks();
+            unsubLogs();
         };
     }, [patientId]);
 
@@ -154,8 +199,8 @@ export default function FamilyDashboard() {
     const hasAlertToday = alerts.length > 0;
 
     // Process data for Summary Cards
-    const totalMeds = data?.tasks?.filter(t => t.icon === 'Pill')?.length || 0;
-    const completedMeds = data?.tasks?.filter(t => t.icon === 'Pill' && t.status === 'Completed')?.length || 0;
+    const totalMeds = data?.tasks?.filter(t => t.category === 'Medication')?.length || 0;
+    const completedMeds = data?.tasks?.filter(t => t.category === 'Medication' && t.status === 'Completed')?.length || 0;
 
     const hasVitalsAlert = data?.vitals?.some(v => v.alertTriggered);
     const vitalsText = data?.vitals?.length > 0 ? (hasVitalsAlert ? "Alert" : "Normal") : "No Data";
@@ -164,7 +209,7 @@ export default function FamilyDashboard() {
     const getMoodEmoji = () => {
         if (!data?.observations || data.observations.length === 0) return "--";
         const lastObs = data.observations[data.observations.length - 1];
-        const emMap = { "Very Sad": '😫', "Sad": '😔', "Neutral": '😐', "Happy": '🙂', "Very Happy": '😄' };
+        const emMap = { "Very Low": '😫', "Low": '😔', "Neutral": '😐', "Good": '🙂', "Excellent": '😄' };
         return emMap[lastObs.mood] || "--";
     };
 
@@ -210,7 +255,8 @@ export default function FamilyDashboard() {
         { icon: 'Home', label: 'Dashboard', path: '/family/dashboard' },
         { icon: 'FileText', label: 'Reports', path: '/family/report' },
         { icon: 'Pill', label: 'Prescriptions', path: '/family/prescriptions' },
-        { icon: 'Bell', label: 'Alerts', path: '/family/alerts' }
+        { icon: 'Bell', label: 'Alerts', path: '/family/alerts' },
+        { icon: 'MessageSquare', label: 'Messages', path: '/family/messages' }
     ];
 
     const renderAlertBanner = () => {
@@ -422,7 +468,8 @@ export default function FamilyDashboard() {
                                     <button 
                                         onClick={async () => {
                                             // Instant override using default mocks if missing
-                                            await generateWeeklyReport(patientId || 'mock_patient_id', patientName || 'Preview Patient');
+                                            const url = await generateWeeklyReport(patientId || 'mock_patient_id', patientName || 'Preview Patient', 'dataurl');
+                                            setPreviewUrl(url);
                                         }}
                                         style={{ 
                                             padding: '12px 16px', backgroundColor: colors.white, color: colors.textSecondary, 
@@ -436,8 +483,8 @@ export default function FamilyDashboard() {
                                     </button>
                                     <button 
                                         onClick={async () => {
-                                            if (patientName) {
-                                                await generateWeeklyReport(patientId, patientName);
+                                            if (patientName || patientId) {
+                                                await generateWeeklyReport(patientId || 'mock_patient_id', patientName || 'Patient', 'download');
                                             } else {
                                                 alert("Patient profile found but name not loaded yet. Click 'Template Preview' instead to bypass.");
                                             }
@@ -467,6 +514,38 @@ export default function FamilyDashboard() {
                     <FamilyBottomNav />
                 </div>
             </div>
+
+            {/* PREVIEW MODAL */}
+            {previewUrl && (
+                <div 
+                    onClick={() => setPreviewUrl(null)}
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ width: '100%', maxWidth: '800px', height: '90vh', backgroundColor: colors.white, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: spacing.shadows.modal }}>
+                        
+                        <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${colors.border}` }}>
+                            <div>
+                                <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: colors.textPrimary }}>Report Preview</h3>
+                                <p style={{ fontSize: '13px', color: colors.textSecondary, margin: '4px 0 0 0' }}>This is an interactive preview. Click outside to close.</p>
+                            </div>
+                            <button 
+                                onClick={() => setPreviewUrl(null)}
+                                style={{
+                                    padding: '8px 16px', backgroundColor: colors.background, color: colors.textPrimary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700'
+                                }}>
+                                Close
+                            </button>
+                        </div>
+                        
+                        <iframe 
+                            src={previewUrl} 
+                            style={{ flex: 1, width: '100%', border: 'none' }}
+                            title="PDF Preview"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

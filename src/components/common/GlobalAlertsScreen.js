@@ -89,9 +89,19 @@ export default function GlobalAlertsScreen() {
                                 let timeStr = 'Just now';
                                 let dateStr = '';
                                 if (alert.timestamp) {
-                                    const date = alert.timestamp.toDate();
-                                    timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                    dateStr = date.toLocaleDateString();
+                                    let date;
+                                    if (alert.timestamp.toDate) {
+                                        date = alert.timestamp.toDate();
+                                    } else if (alert.timestamp.seconds) {
+                                        date = new Date(alert.timestamp.seconds * 1000);
+                                    } else {
+                                        date = new Date(alert.timestamp);
+                                    }
+                                    
+                                    if (!isNaN(date.getTime())) {
+                                        timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                        dateStr = date.toLocaleDateString();
+                                    }
                                 }
 
                                 return (

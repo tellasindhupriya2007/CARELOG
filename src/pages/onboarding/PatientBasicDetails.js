@@ -15,7 +15,10 @@ export default function PatientBasicDetails() {
   const [formData, setFormData] = useState({
     patientName: '',
     age: '',
+    gender: 'Male',
+    bloodGroup: '',
     medicalCondition: '',
+    allergies: '',
     doctorName: '',
     doctorPhone: ''
   });
@@ -80,6 +83,34 @@ export default function PatientBasicDetails() {
               onChange={(e) => handleChange('medicalCondition', e.target.value)}
               error={errors.medicalCondition}
               required
+            />
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>Gender</label>
+                <select 
+                  value={formData.gender} 
+                  onChange={(e) => handleChange('gender', e.target.value)}
+                  style={{ height: '52px', borderRadius: spacing.borderRadius.input, border: `1.5px solid ${colors.border}`, padding: '0 16px', fontSize: '14px', backgroundColor: colors.background, outline: 'none', width: '100%' }}
+                >
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <InputField
+                  label="Blood Group"
+                  placeholder="e.g. O+"
+                  value={formData.bloodGroup}
+                  onChange={(e) => handleChange('bloodGroup', e.target.value)}
+                />
+              </div>
+            </div>
+            <InputField
+              label="Allergies"
+              placeholder="e.g. Penicillin, Peanuts (or 'None')"
+              value={formData.allergies}
+              onChange={(e) => handleChange('allergies', e.target.value)}
             />
             <InputField
               label="Doctor Name"

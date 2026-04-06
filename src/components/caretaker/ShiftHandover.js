@@ -1,340 +1,289 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
-import { collection, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { getLatestHandover, createShiftHandover } from '../../services/handoverService';
+import { getDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { getTodayDateString } from '../../utils/dateHelpers';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import PrimaryButton from '../common/PrimaryButton';
-import SecondaryButton from '../common/SecondaryButton';
-import DangerButton from '../common/DangerButton';
 import Card from '../common/Card';
-import SkeletonCard from '../common/SkeletonCard';
 import { colors } from '../../styles/colors';
-import { spacing } from '../../styles/spacing';
-import { CheckCircle2, XCircle, HeartPulse, Smile, Pill, Loader2, Thermometer, Activity } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { subscribeToDailyLogs, subscribeToTasks } from '../../services/taskService';
+import { typography } from '../../styles/typography';
+import { CheckCircle2, HeartPulse, Pill, Activity, AlertTriangle, Smile, Clock } from 'lucide-react';
 
 export default function ShiftHandover() {
     const navigate = useNavigate();
-    const { user, patientId, logout } = useAuthContext();
+    const { user, patientId } = useAuthContext();
 
     const [loading, setLoading] = useState(true);
-    const [caretakerName, setCaretakerName] = useState('');
-    const [dailyLog, setDailyLog] = useState(null);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [ending, setEnding] = useState(false);
+    const [recording, setRecording] = useState(false);
+    const [snapshot, setSnapshot] = useState(null);
+    const [caregiverName, setCaregiverName] = useState('Caregiver');
+    const [toastMessage, setToastMessage] = useState(null);
+    const [handoverSubmitted, setHandoverSubmitted] = useState(false);
 
-    const [tasks, setTasks] = useState([]);
-    const [completions, setCompletions] = useState({});
+    const checkSubmitted = (data) => {
+        if (!data || !data.createdAt) return false;
+        const snapDate = data.createdAt?.toDate?.() || new Date(data.createdAt);
+        // We assume Handover is locked if created in the last 12 hours by the same caregiver
+        const twelveHoursAgo = new Date();
+        twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+        
+        return (snapDate > twelveHoursAgo && data.caregiverId === user.uid);
+    };
+
+    const fetchSnapshot = async () => {
+        setLoading(true);
+        if (patientId) {
+            const data = await getLatestHandover(patientId);
+            setSnapshot(data);
+            setHandoverSubmitted(checkSubmitted(data));
+        }
+        setLoading(false);
+    };
 
     useEffect(() => {
-        const fetchHandoverData = async () => {
-            if (!user || !patientId) return;
-            try {
-                // Get caretaker name
+        const init = async () => {
+            if (user) {
                 const uDoc = await getDoc(doc(db, 'users', user.uid));
-                if (uDoc.exists()) setCaretakerName(uDoc.data().name || 'Caretaker');
-
-                // Initial fetch for vitals and observations specifically for handover summary
-                const q = query(collection(db, 'dailyLogs'), where('patientId', '==', patientId), where('date', '==', getTodayDateString()));
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    setDailyLog(snap.docs[0].data());
-                }
-            } catch (err) {
-                console.error(err);
+                if (uDoc.exists()) setCaregiverName(uDoc.data().name || 'Caregiver');
+            }
+            if (patientId) {
+                const data = await getLatestHandover(patientId);
+                setSnapshot(data);
+                setHandoverSubmitted(checkSubmitted(data));
             }
             setLoading(false);
         };
-        fetchHandoverData();
-
-        // Real-time completions & tasks
-        const unsubTasks = subscribeToTasks(patientId, setTasks);
-        const unsubLogs = subscribeToDailyLogs(patientId, setCompletions);
-
-        return () => {
-            unsubTasks();
-            unsubLogs();
-        };
+        init();
     }, [user, patientId]);
 
-    const handleEndShift = async () => {
-        setEnding(true);
+    const handleRecordHandover = async () => {
+        if (handoverSubmitted) return; // Prevent duplicates
+        setRecording(true);
         try {
-            // Write timestamp to dailyLog
-            const q = query(collection(db, 'dailyLogs'), where('patientId', '==', patientId), where('date', '==', getTodayDateString()));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-                await updateDoc(snap.docs[0].ref, {
-                    shiftEndedAt: new Date().toISOString()
-                });
-            }
-
-            // End Auth state and route to splash
-            await logout();
-            navigate('/auth/splash', { replace: true });
-        } catch (err) {
-            console.error("Failed to end shift:", err);
-            setShowConfirm(false);
-            setEnding(false);
+            await createShiftHandover(patientId, user.uid, caregiverName);
+            setHandoverSubmitted(true);
+            setToastMessage('Shift Handover Recorded Successfully');
+            setTimeout(() => setToastMessage(null), 3000);
+            
+            // Re-fetch snapshot to show newly created one
+            const updatedData = await getLatestHandover(patientId);
+            setSnapshot(updatedData);
+            
+        } catch (error) {
+            console.error("Error creating handover:", error);
+            setToastMessage('Failed to record handover.');
+            setTimeout(() => setToastMessage(null), 3000);
         }
+        setRecording(false);
     };
 
-    const getScoreColor = (score) => {
-        if (score >= 8) return colors.primaryGreen;
-        if (score >= 5) return colors.alertYellow;
-        return colors.alertRed;
-    };
+    if (loading) {
+        return (
+            <div style={{ backgroundColor: colors.white, height: '100vh', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Activity className="animate-spin" size={32} color={colors.primaryBlue} />
+            </div>
+        );
+    }
 
-    const scoreData = dailyLog ? [
-        { name: 'Score', value: dailyLog.careScore || 0, color: getScoreColor(dailyLog.careScore) },
-        { name: 'Remaining', value: Math.max(0, 10 - (dailyLog.careScore || 0)), color: colors.border }
-    ] : [];
-
-    // Derive mapped elements using new task service data
-    const completedTasks = tasks.filter(t => completions[t.id]?.completed);
-    const missedTasks = tasks.filter(t => !completions[t.id]?.completed);
-
-    const vitals = dailyLog?.vitals || [];
-    const observations = dailyLog?.observations || [];
-
-    const emMap = { "Very Low": '😫', "Low": '😔', "Neutral": '😐', "Good": '🙂', "Excellent": '😄' };
+    const completedCount = snapshot?.tasks?.filter(t => t.status === 'completed').length || 0;
+    const pendingCount = snapshot?.tasks?.filter(t => t.status === 'pending').length || 0;
+    const hasCriticalAlerts = snapshot?.alerts?.some(a => a.type === 'critical');
 
     return (
-        <div style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <ScreenHeader title="Shift Handover" showBack onBack={() => navigate(-1)} />
+        <div style={{ 
+            backgroundColor: '#F8FAFC', 
+            minHeight: '100vh', 
+            width: '100%', 
+            fontFamily: typography.fontFamily,
+            paddingBottom: handoverSubmitted ? '40px' : '120px'
+        }}>
+            <ScreenHeader title="Shift Handover" onBack={() => navigate(-1)} />
 
-            {/* Standardized Main Container */}
-            <div 
-                className="main-content" 
-                style={{ 
-                    padding: 'calc(var(--header-h) + 24px + env(safe-area-inset-top)) 20px 140px 20px', 
-                    flex: 1, 
-                    width: '100%',
-                    maxWidth: '1200px',
-                    margin: '0 auto', 
-                    alignSelf: 'center',
-                    boxSizing: 'border-box'
-                }}
-            >
-                {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <SkeletonCard style={{ height: '80px' }} />
-                        <SkeletonCard style={{ height: '240px' }} />
-                        <SkeletonCard style={{ height: '180px' }} />
-                    </div>
+            {/* Toast Notification */}
+            {toastMessage && (
+                <div style={{
+                    position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)',
+                    backgroundColor: colors.textPrimary, color: colors.white, padding: '12px 24px',
+                    borderRadius: '8px', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}>
+                    <CheckCircle2 size={18} color={toastMessage.includes('Failed') ? colors.alertRed : colors.primaryGreen} />
+                    <span style={{ fontSize: '14px', fontWeight: '600' }}>{toastMessage}</span>
+                </div>
+            )}
+
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                {!snapshot ? (
+                    <Card style={{ padding: '24px', textAlign: 'center' }}>
+                        <Clock size={32} color={colors.textSecondary} style={{ margin: '0 auto 12px' }} />
+                        <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>No previous shift data available</h3>
+                        <p style={{ fontSize: '14px', color: colors.textSecondary, marginTop: '8px' }}>
+                            Record the first handover for this patient to establish a baseline.
+                        </p>
+                    </Card>
                 ) : (
                     <>
-                        {/* Summary Header */}
-                        <Card style={{ padding: '24px', borderLeft: `6px solid ${colors.primaryBlue}` }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <span style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>Clinical Shift Summary</span>
-                                <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, backgroundColor: colors.lightBlue, padding: '4px 8px', borderRadius: '4px' }}>
-                                    {getTodayDateString()}
-                                </span>
-                            </div>
-                            <span style={{ fontSize: '14px', color: colors.textSecondary, fontWeight: '700' }}>Caretaker: {caretakerName}</span>
-                        </Card>
-
-                        {/* Shift Stats Grid - Equal Height */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%' }}>
-                            <Card style={{ 
-                                padding: '24px', backgroundColor: '#F0FDF4', border: '1.5px solid #BBF7D0', 
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' 
-                            }}>
-                                <CheckCircle2 size={24} color="#166534" />
-                                <span style={{ fontSize: '32px', fontWeight: '900', color: '#166534' }}>{completedTasks.length}</span>
-                                <span style={{ fontSize: '10px', fontWeight: '800', color: '#166534', opacity: 0.8, textTransform: 'uppercase' }}>Tasks Done</span>
-                            </Card>
-                            <Card style={{ 
-                                padding: '24px', backgroundColor: missedTasks.length > 0 ? '#FEF2F2' : '#F8FAFC', 
-                                border: missedTasks.length > 0 ? '1.5px solid #FECACA' : `1.5px solid ${colors.border}`, 
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' 
-                            }}>
-                                <XCircle size={24} color={missedTasks.length > 0 ? '#991B1B' : colors.textSecondary} />
-                                <span style={{ fontSize: '32px', fontWeight: '900', color: missedTasks.length > 0 ? '#991B1B' : colors.textPrimary }}>{missedTasks.length}</span>
-                                <span style={{ fontSize: '10px', fontWeight: '800', color: missedTasks.length > 0 ? '#991B1B' : colors.textSecondary, opacity: 0.8, textTransform: 'uppercase' }}>Pending</span>
-                            </Card>
+                        {/* Header Info */}
+                        <div style={{ 
+                            backgroundColor: handoverSubmitted ? '#ECFDF5' : colors.white, 
+                            padding: '16px', borderRadius: '12px', border: `1px solid ${handoverSubmitted ? '#A7F3D0' : colors.border}`,
+                            display: 'flex', flexDirection: 'column', gap: '4px'
+                        }}>
+                            {handoverSubmitted ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669' }}>
+                                    <CheckCircle2 size={16} />
+                                    <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase' }}>
+                                        Current Shift Submitted
+                                    </h3>
+                                </div>
+                            ) : (
+                                <h3 style={{ fontSize: '13px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>
+                                    Previous Snapshot Info
+                                </h3>
+                            )}
+                            <p style={{ fontSize: '16px', fontWeight: '800', color: colors.textPrimary, marginTop: '4px' }}>
+                                {handoverSubmitted ? 'Submitted' : 'Previous Shift'} by {snapshot.caregiverName}
+                            </p>
+                            <p style={{ fontSize: '13px', color: colors.textSecondary, fontWeight: '600' }}>
+                                Recorded at: {new Date(snapshot.createdAt?.toDate?.() || snapshot.createdAt).toLocaleString()}
+                            </p>
                         </div>
 
-                        {/* Categorical Observations */}
-                        <Card style={{ padding: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <Smile size={20} color={colors.primaryBlue} /> 
-                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>General Status</h3>
+                        {/* SECTION 1: Summary */}
+                        <Card style={{ padding: '20px' }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary, marginBottom: '16px' }}>Handover Summary</h3>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <div style={{ flex: 1, backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '28px', fontWeight: '900', color: '#059669' }}>{completedCount}</span>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#059669', textTransform: 'uppercase' }}>Completed Tasks</span>
+                                </div>
+                                <div style={{ flex: 1, backgroundColor: '#FEF2F2', padding: '16px', borderRadius: '12px', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '28px', fontWeight: '900', color: '#DC2626' }}>{pendingCount}</span>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#DC2626', textTransform: 'uppercase' }}>Pending Tasks</span>
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {[
-                                    { label: 'Speech', status: 'CLEAR', color: colors.primaryGreen },
-                                    { label: 'Appetite', status: 'NORMAL', color: colors.primaryGreen },
-                                    { label: 'Activity', status: 'STABLE', color: colors.primaryBlue }
-                                ].map((item, id) => (
-                                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-                                        <span style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>{item.label}</span>
-                                        <span style={{ fontSize: '12px', fontWeight: '900', color: item.color, backgroundColor: colors.white, padding: '4px 12px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                            {item.status}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                            {hasCriticalAlerts && (
+                                <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#FEF2F2', borderRadius: '8px', border: '1px solid #FECACA', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <AlertTriangle size={18} color="#DC2626" />
+                                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626' }}>Critical alerts were reported during this shift.</span>
+                                </div>
+                            )}
                         </Card>
 
-                        {/* Medication Adherence */}
-                        <Card style={{ padding: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <Pill size={20} color={colors.primaryBlue} /> 
-                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Medication Tracker</h3>
+                        {/* SECTION 2: Tasks */}
+                        <Card style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                <Pill size={20} color={colors.primaryBlue} />
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Tasks Snapshot</h3>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {tasks.filter(t => t.category === 'Medication').length > 0 ? (
-                                    tasks.filter(t => t.category === 'Medication').map((m, idx) => (
-                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-                                            <div>
-                                                <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>{m.title}</div>
-                                                <div style={{ fontSize: '12px', color: colors.textSecondary, fontWeight: '700' }}>{m.time}</div>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                {completions[m.id]?.completed ? (
-                                                    <CheckCircle2 size={16} color={colors.primaryGreen} />
-                                                ) : (
-                                                    <XCircle size={16} color={colors.alertRed} />
-                                                )}
-                                                <span style={{ fontSize: '12px', fontWeight: '900', color: completions[m.id]?.completed ? colors.primaryGreen : colors.alertRed }}>
-                                                    {completions[m.id]?.completed ? 'ADMINISTERED' : 'PENDING'}
-                                                </span>
-                                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {snapshot.tasks?.length > 0 ? snapshot.tasks.map((t, idx) => (
+                                    <div key={idx} style={{ 
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', 
+                                        backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` 
+                                    }}>
+                                        <div>
+                                            <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>{t.title}</div>
+                                            <div style={{ fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>{t.time} • {t.category}</div>
                                         </div>
-                                    ))
-                                ) : (
-                                    <p style={{ fontSize: '13px', color: colors.textSecondary, textAlign: 'center', padding: '12px' }}>No medication tasks scheduled.</p>
+                                        <div>
+                                            {t.status === 'completed' ? (
+                                                <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', backgroundColor: '#ECFDF5', color: '#059669', borderRadius: '999px' }}>COMPLETED</span>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', backgroundColor: '#FEF2F2', color: '#DC2626', borderRadius: '999px' }}>PENDING</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <p style={{ fontSize: '13px', color: colors.textSecondary }}>No tasks recorded.</p>
                                 )}
                             </div>
                         </Card>
 
-                        {/* Vitals Summary Table */}
-                        <Card style={{ padding: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <Activity size={20} color={colors.primaryBlue} /> 
-                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Vitals Trend</h3>
+                        {/* SECTION 3: Vitals */}
+                        <Card style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                <HeartPulse size={20} color={colors.primaryBlue} />
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Latest Vitals Snapshot</h3>
                             </div>
-                            {vitals.length === 0 ? (
-                                <p style={{ fontSize: '13px', color: colors.textSecondary, textAlign: 'center', padding: '20px' }}>No vitals recorded.</p>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {vitals.map((v, idx) => (
-                                        <div key={idx} style={{ 
-                                            display: 'flex', justifyContent: 'space-between', padding: '14px 16px', 
-                                            borderBottom: idx !== vitals.length - 1 ? `1px solid ${colors.border}` : 'none' 
-                                        }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>BP: {v.bpSystolic}/{v.bpDiastolic}</span>
-                                                <span style={{ fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>HR: {v.heartRate} bpm</span>
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                <span style={{ fontSize: '14px', fontWeight: '800', color: v.alertTriggered ? colors.alertRed : colors.primaryGreen }}>{v.alertTriggered ? 'Abnormal' : 'Stable'}</span>
-                                                <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary }}>{new Date(v.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
-                                        </div>
-                                    ))}
+                            {snapshot.vitals ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>Heart Rate</div>
+                                        <div style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>{snapshot.vitals.heartRate} <span style={{ fontSize: '12px', fontWeight: '600' }}>bpm</span></div>
+                                    </div>
+                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>Blood Pressure</div>
+                                        <div style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>{snapshot.vitals.bpSystolic}/{snapshot.vitals.bpDiastolic}</div>
+                                    </div>
+                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>Temperature</div>
+                                        <div style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>{snapshot.vitals.temperature}°C</div>
+                                    </div>
                                 </div>
+                            ) : (
+                                <p style={{ fontSize: '13px', color: colors.textSecondary }}>No vitals recorded.</p>
                             )}
                         </Card>
 
-                        {/* Recent Observations */}
-                        <Card style={{ padding: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                                <Loader2 size={20} color={colors.primaryBlue} /> 
-                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Observation Log</h3>
+                        {/* SECTION 4: Observations */}
+                        <Card style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                <Smile size={20} color={colors.primaryBlue} />
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Observations Snapshot</h3>
                             </div>
-                            {observations.length === 0 ? (
-                                <p style={{ fontSize: '13px', color: colors.textSecondary, textAlign: 'center', padding: '20px' }}>No session notes available.</p>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    {observations.map((o, idx) => (
-                                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-                                            <span style={{ fontSize: '24px' }}>{o.mood ? emMap[o.mood] : '📝'}</span>
-                                            <div style={{ flex: 1 }}>
-                                                <span style={{ fontSize: '14px', fontWeight: '800', color: o.isCritical ? colors.alertRed : colors.textPrimary }}>
-                                                    {o.isCritical ? 'Critical clinical flag' : (o.mood ? `Mood: ${o.mood}` : 'Observation Note')}
-                                                </span>
-                                                <p style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '4px', fontWeight: '600' }}>
-                                                    Clocked at {new Date(o.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </p>
-                                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {snapshot.observations?.length > 0 ? snapshot.observations.map((o, idx) => (
+                                    <div key={idx} style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                        <p style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>{o.isCritical ? 'Critical flag raised' : (o.mood ? `Patient mood: ${o.mood}` : 'Observation recorded')}</p>
+                                    </div>
+                                )) : (
+                                    <p style={{ fontSize: '13px', color: colors.textSecondary }}>No observations recorded.</p>
+                                )}
+                            </div>
+                        </Card>
+
+                        {/* SECTION 5: Alerts */}
+                        {(snapshot.alerts?.length > 0) && (
+                            <Card style={{ padding: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                    <AlertTriangle size={20} color={colors.alertRed} />
+                                    <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Active Alerts Snapshot</h3>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {snapshot.alerts.map((a, idx) => (
+                                        <div key={idx} style={{ padding: '12px', backgroundColor: '#FEF2F2', borderRadius: '8px', border: `1px solid #FECACA` }}>
+                                            <p style={{ fontSize: '13px', fontWeight: '700', color: '#991B1B' }}>{a.message}</p>
                                         </div>
                                     ))}
                                 </div>
-                            )}
-                        </Card>
+                            </Card>
+                        )}
                     </>
                 )}
             </div>
 
             {/* Bottom Button Fixed in Viewport */}
-            <div style={{ 
-                position: 'fixed', bottom: 0, left: 0, right: 0, 
-                backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)', 
-                padding: '24px 24px calc(24px + env(safe-area-inset-bottom))', 
-                borderTop: `1px solid ${colors.border}`, zIndex: 1001, 
-                display: 'flex', justifyContent: 'center' 
-            }}>
-                <div style={{ width: '100%', maxWidth: '440px' }}>
-                    <button 
-                        onClick={() => setShowConfirm(true)} 
-                        disabled={loading}
-                        style={{
-                            width: '100%', height: '56px', backgroundColor: colors.primaryGreen, color: colors.white,
-                            borderRadius: '16px', border: 'none', fontSize: '16px', fontWeight: '900',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-                            boxShadow: `0 8px 24px ${colors.primaryGreen}33`
-                        }}
-                    >
-                        <CheckCircle2 size={24} />
-                        RECORD SHIFT HANDOFF
-                    </button>
-                </div>
-            </div>
-
-            {/* Confirmation Modal */}
-            {showConfirm && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', animation: 'fadeIn 0.2s' }}>
-                    <div style={{ backgroundColor: colors.white, width: '100%', maxWidth: '360px', borderRadius: '16px', padding: '32px', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-                        <h3 style={{ fontSize: '20px', fontWeight: '900', marginBottom: '16px', textAlign: 'center' }}>End Session?</h3>
-                        <p style={{ fontSize: '14px', color: colors.textSecondary, textAlign: 'center', marginBottom: '32px', lineHeight: '1.6', fontWeight: '600' }}>
-                            Are you ready to finalize this shift record? All logged vitals and activities will be summarized for the clinical team.
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <button
-                                onClick={handleEndShift}
-                                disabled={ending}
-                                style={{
-                                    width: '100%', height: '56px', backgroundColor: colors.alertRed, color: colors.white,
-                                    fontSize: '16px', fontWeight: '900', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 24px ${colors.alertRed}22`
-                                }}
-                            >
-                                {ending ? <Loader2 size={24} className="spinner" /> : "YES, FINALIZE SHIFT"}
-                            </button>
-                            <button 
-                                onClick={() => setShowConfirm(false)} 
-                                disabled={ending}
-                                style={{ background: 'none', border: 'none', color: colors.textSecondary, fontWeight: '800', fontSize: '14px', padding: '12px', cursor: 'pointer' }}
-                            >
-                                CANCEL
-                            </button>
-                        </div>
+            {!handoverSubmitted && (
+                <div style={{ 
+                    position: 'fixed', bottom: 0, left: 0, right: 0, 
+                    backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)', 
+                    padding: '24px 24px calc(24px + env(safe-area-inset-bottom))', 
+                    borderTop: `1px solid ${colors.border}`, zIndex: 1001, 
+                    display: 'flex', justifyContent: 'center' 
+                }}>
+                    <div style={{ width: '100%', maxWidth: '440px' }}>
+                        <PrimaryButton 
+                            label={recording ? "Recording..." : "Record Shift Handover"}
+                            onClick={handleRecordHandover}
+                            disabled={recording}
+                        />
                     </div>
                 </div>
             )}
-
-            <style>{`
-                .spinner { animation: spin 1s linear infinite; }
-                @keyframes spin { 100% { transform: rotate(360deg); } }
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-            `}</style>
         </div>
     );
 }

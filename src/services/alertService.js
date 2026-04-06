@@ -21,20 +21,7 @@ export const triggerAlert = async (patientId, type, message, source) => {
 
 // Check if there are any alerts for a patient, if not generate mock data
 export const preloadMockAlertsIfNeeded = async (patientId) => {
-    if (!patientId) return;
-    try {
-        const q = query(collection(db, 'alerts'), where('patientId', '==', patientId), limit(1));
-        const snap = await getDocs(q);
-        
-        if (snap.empty) {
-            console.log("Preloading mock alerts for new patient...");
-            await triggerAlert(patientId, 'critical', 'High BP detected (150/100)', 'vitals');
-            await triggerAlert(patientId, 'warning', 'Medication missed at 9:00 PM', 'task');
-            await triggerAlert(patientId, 'normal', 'Routine check completed', 'observation');
-        }
-    } catch (e) {
-        console.error("Error preloading alerts:", e);
-    }
+    // Intentionally left blank. Real alerts only.
 }
 
 // Mark an alert as read

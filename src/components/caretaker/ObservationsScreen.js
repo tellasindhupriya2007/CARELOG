@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, updateDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, setDoc, serverTimestamp, addDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase/config';
 import { useAuthContext } from '../../context/AuthContext';
@@ -82,7 +82,12 @@ export default function ObservationsScreen() {
     };
 
     // Recording Logic
-    const startRecording = async () => {
+    const toggleRecording = async () => {
+        if (isRecording) {
+            stopRecording();
+            return;
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder.current = new MediaRecorder(stream);
@@ -94,9 +99,16 @@ export default function ObservationsScreen() {
 
             mediaRecorder.current.onstop = () => {
                 const audioBlobRecord = new Blob(audioChunks.current, { type: 'audio/webm' });
-                const audioUrlRecord = URL.createObjectURL(audioBlobRecord);
-                setAudioBlob(audioBlobRecord);
-                setAudioUrl(audioUrlRecord);
+                if (audioBlobRecord.size < 500) {
+                    // Invalid/empty recording due to quick click
+                    setAudioBlob(null);
+                    setAudioUrl(null);
+                    alert("Recording too short. Please try again.");
+                } else {
+                    const audioUrlRecord = URL.createObjectURL(audioBlobRecord);
+                    setAudioBlob(audioBlobRecord);
+                    setAudioUrl(audioUrlRecord);
+                }
                 stream.getTracks().forEach(track => track.stop());
             };
 
@@ -127,21 +139,32 @@ export default function ObservationsScreen() {
             setIsPlaying(false);
         } else {
             audioRef.current.src = audioUrl;
-            audioRef.current.play();
+            audioRef.current.play().catch(e => {
+                console.error("Playback error:", e);
+                setIsPlaying(false);
+                alert("Audio playback failed. Please try re-recording.");
+            });
             setIsPlaying(true);
             audioRef.current.onended = () => setIsPlaying(false);
         }
     };
 
-    const deleteRecording = () => {
+    const deleteRecording = (e) => {
+        if (e) { e.stopPropagation(); e.preventDefault(); }
         setAudioBlob(null);
         setAudioUrl(null);
         setRecordTimer(0);
-        if (isPlaying) {
-            audioRef.current.pause();
-            setIsPlaying(false);
+        try {
+            if (isPlaying) {
+                audioRef.current.pause();
+                setIsPlaying(false);
+            }
+            audioRef.current.src = "";
+        } catch(err) {
+            console.error("Error clearing audio:", err);
         }
     };
+
 
     const handleImageSelect = (e) => {
         const file = e.target.files[0];
@@ -189,9 +212,18 @@ export default function ObservationsScreen() {
         try {
             let finalAudioUrl = "";
             if (audioBlob) {
-                const audioRefTarget = ref(storage, `recordings/${patientId}_${Date.now()}.webm`);
-                await uploadBytes(audioRefTarget, audioBlob);
-                finalAudioUrl = await getDownloadURL(audioRefTarget);
+                try {
+                    const audioRefTarget = ref(storage, `patients/${patientId}/recordings/${Date.now()}.webm`);
+                    await Promise.race([
+                        uploadBytes(audioRefTarget, audioBlob),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("Storage timeout")), 8000))
+                    ]);
+                    finalAudioUrl = await getDownloadURL(audioRefTarget);
+                } catch (err) {
+                    console.error("Audio upload failed:", err);
+                    alert("Audio upload failed or timed out. Observation will be saved without audio.");
+                    finalAudioUrl = ""; // Proceed without audio to not lock the UI
+                }
             }
 
             // Handle Image Upload via service
@@ -200,29 +232,68 @@ export default function ObservationsScreen() {
             }
 
             const todayString = getTodayDateString();
-            const logRef = await getDayLogRef(todayString);
-            const logSnap = await getDocs(query(collection(db, 'dailyLogs'), where('__name__', '==', logRef.id)));
-            const existingData = logSnap.docs[0].data();
-            const currentObservations = existingData.observations || [];
+            const logRef = await Promise.race([
+                getDayLogRef(todayString),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout getting log reference")), 5000))
+            ]);
 
             const newObservation = {
                 mood: mood || null,
                 audioUrl: finalAudioUrl || null,
                 hasImage: !!selectedImage,
-                isCritical: isCritical,
+                isCritical: !!isCritical,
                 caretakerName: caretakerName || 'Caretaker',
                 recordedAt: new Date().toISOString()
             };
 
-            await updateDoc(logRef, {
-                observations: [...currentObservations, newObservation]
-            });
+            await Promise.race([
+                updateDoc(logRef, {
+                    observations: arrayUnion(newObservation)
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout saving observation")), 5000))
+            ]);
 
-            await checkCriticalObservationAndAlert(patientId, newObservation);
+            try {
+                await checkCriticalObservationAndAlert(patientId, newObservation);
+            } catch (e) {
+                console.error("Alert trigger failed, continuing...", e);
+            }
+
+            // Send voice message to family members if an audio clip exists
+            if (finalAudioUrl) {
+                try {
+                    const pDoc = await getDoc(doc(db, 'patients', patientId));
+                    if (pDoc.exists()) {
+                        const patData = pDoc.data();
+                        const familyIds = patData.familyIds || (patData.familyId ? [patData.familyId] : []);
+                        for (const fId of familyIds) {
+                            try {
+                                await addDoc(collection(db, 'messages'), {
+                                    patientId,
+                                    senderId: user.uid,
+                                    senderName: caretakerName || 'Caretaker',
+                                    senderRole: 'Caretaker',
+                                    receiverId: fId,
+                                    type: 'voice',
+                                    message: 'Clinical Voice Log',
+                                    audioUrl: finalAudioUrl,
+                                    timestamp: serverTimestamp(),
+                                    isRead: false
+                                });
+                            } catch (e) {
+                                console.error("Failed to send to family member", e);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch family members", e);
+                }
+            }
+
             showToast('Observation recorded successfully!', 'success');
         } catch (error) {
-            console.error(error);
-            alert('Failed to save observation.');
+            console.error("HandleSave encountered an error/timeout:", error);
+            alert('Network timeout or error. Please refresh and try again.');
             setSubmitting(false);
         }
     };
@@ -248,9 +319,7 @@ export default function ObservationsScreen() {
                 onBack={() => navigate(-1)} 
                 rightIcon={
                     <button 
-                        onPointerDown={(e) => { e.preventDefault(); !audioUrl && startRecording(); }}
-                        onPointerUp={stopRecording}
-                        onPointerLeave={stopRecording}
+                        onClick={(e) => { e.preventDefault(); !audioUrl && toggleRecording(); }}
                         style={{ 
                             width: '40px', height: '40px', borderRadius: '50%', 
                             backgroundColor: isRecording ? colors.alertRed : colors.lightBlue, 
@@ -321,15 +390,15 @@ export default function ObservationsScreen() {
                         }}>
                             {!audioUrl ? (
                                 <button
-                                    onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
-                                    onPointerUp={stopRecording}
+                                    onClick={(e) => { e.preventDefault(); toggleRecording(); }}
                                     style={{
                                         width: '40px', height: '40px', borderRadius: '50%', border: 'none',
                                         backgroundColor: isRecording ? colors.alertRed : colors.primaryBlue,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                                        transition: 'all 0.2s'
                                     }}
                                 >
-                                    <Mic size={20} color={colors.white} />
+                                    {isRecording ? <div style={{ width: '12px', height: '12px', backgroundColor: 'white', borderRadius: '2px' }}/> : <Mic size={20} color={colors.white} />}
                                 </button>
                             ) : (
                                 <div style={{ display: 'flex', gap: '8px' }}>

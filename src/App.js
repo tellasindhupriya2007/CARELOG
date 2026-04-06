@@ -5,6 +5,7 @@ import { DoctorProvider } from './context/DoctorContext';
 import { SocketProvider } from './context/SocketContext';
 import PrivateRoute from './components/common/PrivateRoute';
 import PwaWrapper from './components/common/PwaWrapper';
+import TaskMonitor from './services/TaskMonitor';
 
 // Auth
 import Splash from './pages/auth/Splash';
@@ -18,12 +19,14 @@ import AlertsPage from './pages/caretaker/Alerts';
 import Observations from './pages/caretaker/Observations';
 import ShiftHandover from './pages/caretaker/ShiftHandover';
 import CaretakerMessages from './pages/caretaker/Messages';
+import CaretakerPrescriptions from './pages/caretaker/Prescriptions';
 
 // Family
 import FamilyHome from './pages/family/Home';
 import FamilyAlerts from './pages/family/Alerts';
 import FamilyPrescriptions from './pages/family/Prescriptions';
 import FamilyReport from './pages/family/WeeklyReport';
+import FamilyMessages from './pages/family/Messages';
 
 // Onboarding
 import PatientBasicDetails from './pages/onboarding/PatientBasicDetails';
@@ -48,6 +51,7 @@ function App() {
         <DoctorProvider>
           <Router>
             <PwaWrapper>
+              <TaskMonitor />
               <Routes>
                 {/* Base */}
                 <Route path="/" element={<Navigate to="/auth/splash" replace />} />
@@ -67,6 +71,7 @@ function App() {
                   <Route path="/caretaker/observations" element={<Observations />} />
                   <Route path="/caretaker/handover" element={<ShiftHandover />} />
                   <Route path="/caretaker/messages" element={<CaretakerMessages />} />
+                  <Route path="/caretaker/prescriptions" element={<CaretakerPrescriptions />} />
                 </Route>
 
                 {/* Family */}
@@ -75,6 +80,7 @@ function App() {
                   <Route path="/family/alerts" element={<FamilyAlerts />} />
                   <Route path="/family/prescriptions" element={<FamilyPrescriptions />} />
                   <Route path="/family/report" element={<FamilyReport />} />
+                  <Route path="/family/messages" element={<FamilyMessages />} />
                   <Route path="/family/onboarding/step-1" element={<PatientBasicDetails />} />
                   <Route path="/family/onboarding/step-2" element={<CarePlanSetup />} />
                   <Route path="/family/onboarding/step-3" element={<InviteCaretaker />} />

@@ -174,6 +174,8 @@ export default function CaretakerDashboard() {
 
     const renderTask = (task) => {
         const isDone = completions[task.id]?.completed;
+        const completedAt = completions[task.id]?.completedAt;
+        const completedTimeStr = completedAt ? new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
         const catColorMap = {
             'Medication': { bg: colors.lightBlue, text: colors.primaryBlue },
             'Vitals Monitoring': { bg: '#F3E8FF', text: '#8B5CF6' },
@@ -209,6 +211,12 @@ export default function CaretakerDashboard() {
                         <span style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px', backgroundColor: catStyle.bg, color: catStyle.text, fontWeight: '800', whiteSpace: 'nowrap' }}>{task.category}</span>
                     </div>
                     {task.time && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: colors.textSecondary }}><Clock size={12} /><span style={{ fontSize: '12px', fontWeight: '700' }}>{task.time}</span></div>}
+                    {isDone && completedTimeStr && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#065F46', marginTop: '4px' }}>
+                            <CheckCircle2 size={12} />
+                            <span style={{ fontSize: '11px', fontWeight: '700', textDecoration: 'none' }}>Completed at {completedTimeStr}</span>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -280,6 +288,7 @@ export default function CaretakerDashboard() {
 
     const sidebarItems = [
         { icon: 'Home', label: 'Dashboard', path: '/caretaker/dashboard' },
+        { icon: 'Pill', label: 'Prescriptions', path: '/caretaker/prescriptions' },
         { icon: 'HeartPulse', label: 'Vitals', path: '/caretaker/vitals' },
         { icon: 'Clipboard', label: 'Observations', path: '/caretaker/observations' },
         { icon: 'Bell', label: 'Alerts', path: '/caretaker/alerts' },
