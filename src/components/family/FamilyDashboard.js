@@ -16,10 +16,20 @@ import { colors } from '../../styles/colors';
 import { typography } from '../../styles/typography';
 import { spacing } from '../../styles/spacing';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Bell, Pill, HeartPulse, Smile, AlertTriangle, Info, FileText, ChevronRight, Mic, Camera, Users } from 'lucide-react';
+import { 
+    Bell, Pill, HeartPulse, Smile, AlertTriangle, Info, 
+    FileText, ChevronRight, Mic, Camera, Users, User, 
+    Home, MessageSquare, LogOut, ShieldAlert 
+} from 'lucide-react';
 import TaskManager from './TaskManager';
 import { generateWeeklyReport } from '../../services/reportService';
 import { createDefaultWorkflow } from '../../services/taskService';
+
+const LucideIcons = { 
+    Bell, Pill, HeartPulse, Smile, AlertTriangle, Info, 
+    FileText, ChevronRight, Mic, Camera, Users, User, 
+    Home, MessageSquare, LogOut, ShieldAlert 
+};
 
 export default function FamilyDashboard() {
     const navigate = useNavigate();
@@ -28,6 +38,8 @@ export default function FamilyDashboard() {
     const [loading, setLoading] = useState(true);
     const [patientName, setPatientName] = useState('');
     const [patientHumanId, setPatientHumanId] = useState('');
+    const [patientData, setPatientData] = useState(null);
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [data, setData] = useState(null);
     const [alerts, setAlerts] = useState([]);
     const [error, setError] = useState(null);
@@ -62,6 +74,7 @@ export default function FamilyDashboard() {
                         const pData = pDoc.data();
                         setPatientName(pData.name);
                         setPatientHumanId(pData.patientId || '');
+                        setPatientData(pData);
                     }
                 }
             } catch (err) {
@@ -282,7 +295,8 @@ export default function FamilyDashboard() {
     const timeline = buildTimeline();
 
     const sidebarItems = [
-        { icon: 'Home', label: 'Dashboard', path: '/family/dashboard' },
+        { icon: 'Home', label: 'Dashboard', onClick: () => setActiveTab('dashboard'), active: activeTab === 'dashboard' },
+        { icon: 'User', label: 'Patient Profile', onClick: () => setActiveTab('profile'), active: activeTab === 'profile' },
         { icon: 'FileText', label: 'Reports', path: '/family/report' },
         { icon: 'Pill', label: 'Prescriptions', path: '/family/prescriptions' },
         { icon: 'Bell', label: 'Alerts', path: '/family/alerts' },
@@ -335,7 +349,36 @@ export default function FamilyDashboard() {
 
     return (
         <div className="desktop-layout" style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <Sidebar navItems={sidebarItems} />
+            <div className="sidebar">
+                {/* Logo */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px', paddingLeft: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: colors.primaryBlue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: colors.white, fontWeight: 'bold', fontSize: '18px' }}>C</span>
+                    </div>
+                    <span style={{ fontSize: '20px', fontWeight: 'bold', color: colors.primaryBlue }}>CareLog</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {sidebarItems.map((item, index) => {
+                        const bg = item.active ? '#EFF6FF' : 'transparent';
+                        const color = item.active ? colors.primaryBlue : colors.textSecondary;
+                        const Icon = LucideIcons[item.icon];
+                        return (
+                            <div key={index} onClick={item.onClick || (() => navigate(item.path))} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', backgroundColor: bg, cursor: 'pointer', transition: 'all 0.2s', minHeight: '44px' }}>
+                                {Icon && <Icon size={20} color={color} />}
+                                <span style={{ fontSize: '15px', color: color, fontWeight: item.active ? '600' : '500' }}>{item.label}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div style={{ marginTop: 'auto', borderTop: `1px solid ${colors.border}`, paddingTop: '16px' }}>
+                    <div onClick={() => navigate('/auth/splash')} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', cursor: 'pointer', color: colors.alertRed }}>
+                        <LucideIcons.LogOut size={20} color={colors.alertRed} />
+                        <span style={{ fontSize: '15px', fontWeight: '600' }}>Log Out</span>
+                    </div>
+                </div>
+            </div>
             <div className="desktop-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0 }}>
 
 
@@ -407,6 +450,76 @@ export default function FamilyDashboard() {
                         </div>
                     ) : (
                         <div className="dashboard-structure" style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', maxWidth: '840px', margin: '0 auto' }}>
+                           
+                           {activeTab === 'profile' ? (
+                               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                    <div style={{ backgroundColor: colors.white, borderRadius: '24px', padding: '32px', boxShadow: spacing.shadows.card, position: 'relative', overflow: 'hidden' }}>
+                                        <div style={{ position: 'absolute', top: 0, right: 0, width: '150px', height: '150px', background: `linear-gradient(135deg, ${colors.primaryBlue}10, transparent)`, borderRadius: '0 0 0 100%' }} />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', position: 'relative' }}>
+                                            <div style={{ width: '80px', height: '80px', borderRadius: '24px', backgroundColor: colors.lightBlue, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: '900', color: colors.primaryBlue }}>
+                                                {patientName ? patientName.charAt(0) : 'P'}
+                                            </div>
+                                            <div>
+                                                <h1 style={{ fontSize: '28px', fontWeight: '900', color: colors.textPrimary, margin: '0 0 4px' }}>{patientName}</h1>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ padding: '4px 10px', backgroundColor: colors.primaryBlue, color: 'white', borderRadius: '8px', fontSize: '12px', fontWeight: '800', letterSpacing: '0.5px' }}>{patientHumanId}</span>
+                                                    <span style={{ color: colors.textMuted, fontSize: '14px', fontWeight: '600' }}>Patient ID</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '32px', marginTop: '40px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>Identity</h3>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span style={{ fontSize: '14px', color: colors.textMuted, fontWeight: '600' }}>Age</span>
+                                                        <span style={{ fontSize: '14px', color: colors.textPrimary, fontWeight: '700' }}>{patientData?.age || '--'} yrs</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span style={{ fontSize: '14px', color: colors.textMuted, fontWeight: '600' }}>Gender</span>
+                                                        <span style={{ fontSize: '14px', color: colors.textPrimary, fontWeight: '700' }}>{patientData?.gender || '--'}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span style={{ fontSize: '14px', color: colors.textMuted, fontWeight: '600' }}>Blood Group</span>
+                                                        <span style={{ fontSize: '14px', color: colors.alertRed, fontWeight: '800' }}>{patientData?.bloodGroup || '--'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                <h3 style={{ fontSize: '14px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>Clinical Status</h3>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span style={{ fontSize: '12px', color: colors.textMuted, fontWeight: '600', marginBottom: '4px' }}>Conditions</span>
+                                                        <span style={{ fontSize: '14px', color: colors.textPrimary, fontWeight: '700' }}>{patientData?.conditions || 'No conditions listed'}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span style={{ fontSize: '12px', color: colors.textMuted, fontWeight: '600', marginBottom: '4px' }}>Allergies</span>
+                                                        <span style={{ fontSize: '14px', color: colors.alertOrange, fontWeight: '800' }}>{patientData?.allergies || 'None identified'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ backgroundColor: colors.white, borderRadius: '24px', padding: '24px', boxShadow: spacing.shadows.card }}>
+                                        <h3 style={{ fontSize: '16px', fontWeight: '800', color: colors.textPrimary, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <LucideIcons.ShieldAlert size={18} color={colors.alertRed} /> Emergency Contact
+                                        </h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>{patientData?.emergencyContact || '--'}</div>
+                                                <div style={{ fontSize: '13px', color: colors.textSecondary, fontWeight: '600' }}>Primary Contact</div>
+                                            </div>
+                                            <div style={{ fontSize: '16px', fontWeight: '900', color: colors.primaryBlue, backgroundColor: colors.lightBlue, padding: '10px 16px', borderRadius: '12px' }}>
+                                                {patientData?.emergencyPhone || '--'}
+                                            </div>
+                                        </div>
+                                    </div>
+                               </div>
+                           ) : (
+                               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             {/* Alert Banner for Desktop (if any) */}
                             <div className="desktop-only">
                                 {renderAlertBanner()}
@@ -548,7 +661,9 @@ export default function FamilyDashboard() {
                                         Generate PDF
                                     </button>
                                 </div>
-                            </div>
+                                    </div>
+                               </div>
+                           )}
                         </div>
                     )}
                 </div>

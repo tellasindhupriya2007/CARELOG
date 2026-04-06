@@ -1,16 +1,24 @@
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDocs, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDocs, getDoc, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 // Trigger an alert and save it to the 'alerts' collection
 export const triggerAlert = async (patientId, type, message, source) => {
     try {
+        // Fetch patient to get doctorId and name
+        const pSnap = await getDoc(doc(db, 'patients', patientId));
+        const pData = pSnap.exists() ? pSnap.data() : { name: 'Unknown' };
+
         const alertsRef = collection(db, 'alerts');
         await addDoc(alertsRef, {
             patientId,
+            patientName: pData.name || 'Unknown',
+            doctorId: pData.doctorId || null,
             type, // "critical" | "warning" | "normal"
             message,
+            severity: type, // fallback for legacy
             source, // "vitals" | "task" | "observation"
             isRead: false,
+            status: 'active',
             timestamp: serverTimestamp()
         });
         console.log(`Alert triggered: ${message}`);
@@ -36,16 +44,15 @@ export const markAlertAsRead = async (alertId) => {
     }
 };
 
-// Real-time listener for alerts for a specific patient (or all if null)
-export const listenToAlerts = (patientId, callback) => {
+// Real-time listener for alerts for a specific patient OR doctor (if provided)
+export const listenToAlerts = ({ patientId = null, doctorId = null }, callback) => {
     let q;
-    if (!patientId) {
-        q = query(collection(db, 'alerts'));
+    if (patientId) {
+        q = query(collection(db, 'alerts'), where('patientId', '==', patientId));
+    } else if (doctorId) {
+        q = query(collection(db, 'alerts'), where('doctorId', '==', doctorId));
     } else {
-        q = query(
-            collection(db, 'alerts'), 
-            where('patientId', '==', patientId)
-        );
+        q = query(collection(db, 'alerts'));
     }
     
     return onSnapshot(q, (snapshot) => {

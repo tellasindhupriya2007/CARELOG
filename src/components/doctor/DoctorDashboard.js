@@ -7,7 +7,7 @@ import { getTodayDateString } from '../../utils/dateHelpers';
 import { DS, statusMeta } from './ds';
 import DoctorShell from './DoctorShell';
 import PatientDetails from './PatientDetails';
-import { seedSamplePatientsIfEmpty, subscribeToDoctorPatients } from '../../services/patientService';
+import { subscribeToDoctorPatients } from '../../services/patientService';
 import {
     Search, Activity, HeartPulse, Clock, Plus,
     Users, AlertTriangle, CheckCircle, UserPlus
@@ -22,26 +22,21 @@ export default function DoctorDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPatientId, setSelectedPatientId] = useState(null);
     const [alertCount, setAlertCount] = useState(0);
-    const [seeded, setSeeded] = useState(false);
 
-    // ── Auto-seed sample patients if Firestore is empty ──────
-    useEffect(() => {
-        if (!user?.uid || seeded) return;
-        seedSamplePatientsIfEmpty(user.uid).then(() => setSeeded(true));
-    }, [user?.uid, seeded]);
+
 
     // ── Subscribe to patients via patientService ─────────────
     useEffect(() => {
         if (!user?.uid) return;
         return subscribeToDoctorPatients(user.uid, (pts) => {
-            setPatients(pts.map(pt => ({
+            setPatients(pts.filter(p => !!p.patientId).map(pt => ({
                 ...pt,
                 status: 'ORANGE',
                 lastUpdated: 'No data today',
                 latestVitals: null,
             })));
         });
-    }, [user?.uid, seeded]);
+    }, [user?.uid]);
 
     // ── Enrich patients with today's vitals ──────────────────
     useEffect(() => {
@@ -80,9 +75,13 @@ export default function DoctorDashboard() {
 
     // ── Alert count subscription ─────────────────────────────
     useEffect(() => {
-        if (!user?.uid) return;
-        // Count unread alerts (all patients under this doctor)
-        const q = query(collection(db, 'alerts'), where('isRead', '==', false));
+        if (!user?.uid) { setAlertCount(0); return; }
+        
+        // Filter alerts by doctorId for the current doctor
+        const q = query(collection(db, 'alerts'), 
+            where('isRead', '==', false),
+            where('doctorId', '==', user.uid)
+        );
         return onSnapshot(q, snap => setAlertCount(snap.size));
     }, [user?.uid]);
 

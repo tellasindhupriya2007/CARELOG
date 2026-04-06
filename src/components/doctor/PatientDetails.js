@@ -82,7 +82,15 @@ export default function PatientDetails({ inlinePatientId, onClose }) {
 
     const handleAddNote = async () => {
         if (!newNote.trim()) return;
-        await addDoc(collection(db, 'notes'), { patientId: id, doctorId: 'DR_CURRENT', note: newNote, timestamp: Date.now(), visibleToFamily: true, visibleToCaregiver: true });
+        await addDoc(collection(db, 'notes'), { 
+            patientId: id, 
+            doctorId: user.uid, 
+            authorName: user.displayName || 'Doctor',
+            note: newNote, 
+            timestamp: Date.now(), 
+            visibleToFamily: true, 
+            visibleToCaregiver: true 
+        });
         setNewNote('');
     };
 
@@ -365,32 +373,34 @@ function LogsTab({ careLogs, onAction }) {
 }
 
 // ─── MEDIA TAB ─────────────────────────────────────────────────────────────
-const MOCK_IMAGES = [
-    { url: 'https://images.unsplash.com/photo-1584515933487-779824d29309?w=400&q=80', description: 'Morning routine - patient ambulating with support', uploadedBy: 'Ravi Caregiver', createdAt: new Date(Date.now() - 86400000) },
-    { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&q=80', description: 'Post-therapy session completed', uploadedBy: 'Anita Nurse', createdAt: new Date(Date.now() - 172800000) },
-    { url: 'https://images.unsplash.com/photo-1576671081837-49000212a370?w=400&q=80', description: 'Meal assistance - lunch intake 80%', uploadedBy: 'Ravi Caregiver', createdAt: new Date(Date.now() - 259200000) },
-];
 function MediaTab({ media }) {
-    const combined = [...(media || []), ...MOCK_IMAGES];
+    const combined = media || [];
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                 <Image size={15} color={DS.secondary} />
                 <span style={sectionLabel}>Caregiver Photos ({combined.length})</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-                {combined.map((item, idx) => (
-                    <div key={idx} style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(25,28,30,0.06)', backgroundColor: DS.surfaceLowest }}>
-                        <div style={{ position: 'relative', paddingTop: '65%', overflow: 'hidden', backgroundColor: DS.surfaceHigh }}>
-                            <img src={item.url} alt={item.description} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
+            {combined.length === 0 ? (
+                 <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: 'white', borderRadius: '24px', border: `1px dashed ${DS.outlineVariant}` }}>
+                    <Image size={48} color={DS.surfaceHigh} style={{ margin: '0 auto 16px', display: 'block' }} />
+                    <p style={{ fontWeight: '700', fontSize: '15px', color: DS.textMuted, margin: 0 }}>No media uploaded by caretaker yet.</p>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                    {combined.map((item, idx) => (
+                        <div key={idx} style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(25,28,30,0.06)', backgroundColor: DS.surfaceLowest }}>
+                            <div style={{ position: 'relative', paddingTop: '65%', overflow: 'hidden', backgroundColor: DS.surfaceHigh }}>
+                                <img src={item.url} alt={item.description} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
+                            </div>
+                            <div style={{ padding: '12px' }}>
+                                <p style={{ fontSize: '13px', color: DS.textPrimary, fontWeight: '600', margin: '0 0 4px 0', lineHeight: 1.4 }}>{item.description || 'No description'}</p>
+                                <p style={{ fontSize: '11px', color: DS.textMuted, fontWeight: '600', margin: 0 }}>{item.uploadedBy || 'Caregiver'} · {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</p>
+                            </div>
                         </div>
-                        <div style={{ padding: '12px' }}>
-                            <p style={{ fontSize: '13px', color: DS.textPrimary, fontWeight: '600', margin: '0 0 4px 0', lineHeight: 1.4 }}>{item.description || 'No description'}</p>
-                            <p style={{ fontSize: '11px', color: DS.textMuted, fontWeight: '600', margin: 0 }}>{item.uploadedBy || 'Unknown'} · {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -508,6 +518,7 @@ function CarePlanTab({ tasks, patientId }) {
 
 // ─── NOTES TAB ─────────────────────────────────────────────────────────────
 function NotesTab({ clinicalNotes, newNote, setNewNote, onAdd }) {
+    const { user } = useAuthContext();
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>

@@ -167,65 +167,11 @@ export const linkById = async (humanId, userId, role) => {
     return pDoc.id;
 };
 
-// ─── SEED ────────────────────────────────────────────────
-
-const SEED_PATIENTS = [
-    {
-        name: 'Tella Sriramulu', age: 78, gender: 'Male', bloodGroup: 'O+',
-        conditions: 'Brain Injury, Hypertension', allergies: 'Penicillin',
-        medications: 'Aspirin 81mg, Lisinopril 10mg',
-        emergencyContact: 'Sindhu (Daughter)', emergencyPhone: '+91 98765 43210',
-    },
-    {
-        name: 'Priya Sharma', age: 65, gender: 'Female', bloodGroup: 'A+',
-        conditions: 'Hypertension', allergies: 'Sulfa',
-        medications: 'Amlodipine 5mg, Metoprolol 25mg',
-        emergencyContact: 'Rahul Sharma (Son)', emergencyPhone: '+91 98001 11222',
-    },
-    {
-        name: 'Ravi Kumar', age: 72, gender: 'Male', bloodGroup: 'B+',
-        conditions: 'Diabetes Type 2', allergies: 'None',
-        medications: 'Metformin 500mg, Glipizide 5mg',
-        emergencyContact: 'Kavitha Kumar (Wife)', emergencyPhone: '+91 97700 55666',
-    },
-];
-
+// ─── DEPRECATED ──────────────────────────────────────────
 /**
- * Auto-seed sample patients for a doctor if collection is empty.
- * Includes mock alerts for demonstration.
+ * Auto-seed sample patients - DEPRECATED: Transitioned to real-data only.
  */
-export const seedSamplePatientsIfEmpty = async (doctorId) => {
-    if (!doctorId) return;
-    const snap = await getDocs(query(collection(db, PATIENTS), where('doctorId', '==', doctorId)));
-    if (!snap.empty) return; // already seeded
-
-    const { addDoc: _add } = await import('firebase/firestore');
-
-    for (const pt of SEED_PATIENTS) {
-        const ref = await addDoc(collection(db, PATIENTS), {
-            ...pt,
-            doctorId,
-            caregiverId: null,
-            familyId: null,
-            status: 'active',
-            notes: '',
-            address: '',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        });
-
-        // Seed 2 alerts per patient
-        await addDoc(collection(db, 'alerts'), {
-            patientId: ref.id, patientName: pt.name,
-            type: 'critical', severity: 'critical',
-            message: 'High BP detected (158/98)',
-            timestamp: new Date().toISOString(), isRead: false, status: 'active',
-        });
-        await addDoc(collection(db, 'alerts'), {
-            patientId: ref.id, patientName: pt.name,
-            type: 'warning', severity: 'warning',
-            message: `Medication missed: ${pt.medications.split(',')[0]}`,
-            timestamp: new Date(Date.now() - 3600000).toISOString(), isRead: false, status: 'active',
-        });
-    }
+export const seedSamplePatientsIfEmpty = async () => {
+    // Seeding disabled to follow real-patient workflow.
+    return;
 };

@@ -432,12 +432,14 @@ export default function ChatInterface({ currentUser, patientId, userRole }) {
                                                         </div>
                                                     ) : (msg.type === 'image' || msg.type === 'photo' || msg.imageUrl || (msg.url && !msg.audioUrl)) ? (
                                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                            <img 
-                                                                src={msg.imageUrl || msg.url} 
-                                                                alt="Attachment" 
-                                                                style={{ maxWidth: '100%', borderRadius: '14px', display: 'block', maxHeight: '300px', objectFit: 'cover' }} 
-                                                                onClick={() => window.open(msg.imageUrl || msg.url, '_blank')}
-                                                            />
+                                                            {(msg.imageUrl || msg.url) && (
+                                                                <img 
+                                                                    src={msg.imageUrl || msg.url} 
+                                                                    alt="Attachment" 
+                                                                    style={{ maxWidth: '100%', borderRadius: '14px', display: 'block', maxHeight: '300px', objectFit: 'cover' }} 
+                                                                    onClick={() => window.open(msg.imageUrl || msg.url, '_blank')}
+                                                                />
+                                                            )}
                                                             {msg.message && <div style={{ padding: '8px 12px', fontSize: '13px' }}>{msg.message}</div>}
                                                         </div>
                                                     ) : (

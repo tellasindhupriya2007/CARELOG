@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthContext } from '../../context/AuthContext';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { DS, card, sectionLabel, gradientBtn, statusMeta } from './ds';
@@ -17,6 +18,7 @@ function Skeleton({ height = '60px', borderRadius = '14px' }) {
 
 export default function DoctorAlerts() {
     const navigate = useNavigate();
+    const { user } = useAuthContext();
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('All');
@@ -24,8 +26,9 @@ export default function DoctorAlerts() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        if (!user?.uid) return;
         try {
-            const q = query(collection(db, 'alerts'));
+            const q = query(collection(db, 'alerts'), where('doctorId', '==', user.uid));
             const unsub = onSnapshot(q, (snap) => {
                 const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
                     const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;

@@ -120,41 +120,78 @@ export const sendMessage = async ({ senderId, senderName, senderRole, receiverId
 export const subscribeToMessages = (userId, peerId, onMessage) => {
     if (!userId || !peerId) return () => {};
 
-    // Two queries, no orderBy (avoids composite index requirement) — sorted client-side
+    console.log(`[SocketService] Subscribing to messages between ${userId} and ${peerId}`);
+
+    // Query 1: All messages sent BY me
     const q1 = query(
         collection(db, 'messages'),
-        where('senderId', '==', userId),
-        where('receiverId', '==', peerId)
+        where('senderId', '==', userId)
     );
+    // Query 2: All messages sent TO me
     const q2 = query(
         collection(db, 'messages'),
-        where('senderId', '==', peerId),
         where('receiverId', '==', userId)
     );
 
     let msgs1 = [];
     let msgs2 = [];
+    let socketMsgs = [];
+
     const emitMerged = () => {
-        const merged = [...msgs1, ...msgs2]
-            .sort((a, b) => {
-                const ta = a.timestamp?.toDate?.() || new Date(a.timestamp || 0);
-                const tb = b.timestamp?.toDate?.() || new Date(b.timestamp || 0);
-                return ta - tb;
-            });
+        // Only keep messages involving the peer
+        const f1 = msgs1.filter(m => m.receiverId === peerId);
+        const f2 = msgs2.filter(m => m.senderId === peerId);
+        
+        const all = [...f1, ...f2, ...socketMsgs];
+        
+        // Multi-stage deduplication: ID or temporary messageId
+        const unique = Array.from(new Map(all.map(m => [m.id || m.messageId, m])).values());
+        
+        const merged = unique.sort((a, b) => {
+            const getTs = (m) => {
+                const raw = m.timestamp;
+                if (!raw) return Date.now(); 
+                if (raw.toDate) return raw.toDate().getTime();
+                if (typeof raw === 'string') return new Date(raw).getTime();
+                if (typeof raw === 'number') return raw;
+                return Date.now();
+            };
+            return getTs(a) - getTs(b);
+        });
+        
         onMessage(merged);
     };
 
     const u1 = onSnapshot(q1, (snap) => {
-        msgs1 = snap.docs.map(d => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate?.() || new Date(d.data().timestamp) }));
+        msgs1 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         emitMerged();
-    }, (err) => console.warn('[Firestore q1 error]', err.message));
+    }, (err) => console.error('[Firestore q1 error]', err));
 
     const u2 = onSnapshot(q2, (snap) => {
-        msgs2 = snap.docs.map(d => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate?.() || new Date(d.data().timestamp) }));
+        msgs2 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         emitMerged();
-    }, (err) => console.warn('[Firestore q2 error]', err.message));
+    }, (err) => console.error('[Firestore q2 error]', err));
 
-    return () => { u1(); u2(); };
+    // Socket Instant updates
+    const handleReceive = (msg) => {
+        if (msg.senderId === peerId || msg.receiverId === peerId) {
+            socketMsgs.push(msg);
+            emitMerged();
+        }
+    };
+    
+    if (socket) {
+        socket.on('receive_message', handleReceive);
+        socket.on('message_delivered', (ack) => {
+           // update local temp message if needed
+        });
+    }
+
+    return () => { 
+        u1(); 
+        u2(); 
+        if (socket) socket.off('receive_message', handleReceive);
+    };
 };
 
 /**
