@@ -105,21 +105,34 @@ export default function ChatInterface({ currentUser, patientId, userRole }) {
                 };
 
                 const tasks = [];
-                // If I am NOT the doctor, add doctor
+                // 1. Doctor
                 if (pat.doctorId && pat.doctorId !== myId) {
                     tasks.push(addPeer(pat.doctorId, 'Doctor', 'Attending Doctor', Stethoscope, '#EEF2FF', '#1E40AF'));
                 }
-                // If I am NOT the caregiver, add caregiver
-                if (pat.caretakerId && pat.caretakerId !== myId) {
-                    tasks.push(addPeer(pat.caretakerId, 'Caregiver', 'Caregiver', User, '#EDE9FE', '#712AE2'));
-                }
-                // Family
-                const fIds = pat.familyIds ? pat.familyIds : (pat.familyId ? [pat.familyId] : []);
-                for (const fid of fIds) {
+
+                // 2. Caregiver / Caretaker (Handle both singular and plural keys)
+                const caretakerIds = new Set();
+                if (pat.caretakerId) caretakerIds.add(pat.caretakerId);
+                if (pat.caregiverId) caretakerIds.add(pat.caregiverId);
+                if (Array.isArray(pat.caretakerIds)) pat.caretakerIds.forEach(id => caretakerIds.add(id));
+                if (Array.isArray(pat.caregiverIds)) pat.caregiverIds.forEach(id => caretakerIds.add(id));
+
+                caretakerIds.forEach(cid => {
+                    if (cid !== myId) {
+                        tasks.push(addPeer(cid, 'Caregiver', 'Caregiver', User, '#EDE9FE', '#712AE2'));
+                    }
+                });
+
+                // 3. Family members
+                const familyIds = new Set();
+                if (pat.familyId) familyIds.add(pat.familyId);
+                if (Array.isArray(pat.familyIds)) pat.familyIds.forEach(id => familyIds.add(id));
+
+                familyIds.forEach(fid => {
                     if (fid !== myId) {
                         tasks.push(addPeer(fid, 'Family', 'Family Member', Home, '#DCFCE7', '#059669'));
                     }
-                }
+                });
 
                 await Promise.all(tasks);
                 
@@ -293,9 +306,30 @@ export default function ChatInterface({ currentUser, patientId, userRole }) {
                     )}
 
                     {!loadingContacts && contacts.length === 0 && (
-                        <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-                            <User size={32} color={C.surfaceHigh} style={{ margin: '0 auto 8px', display: 'block' }} />
-                            <p style={{ fontSize: '13px', color: C.textMuted, fontWeight: '600', margin: 0 }}>No contacts available for this patient</p>
+                        <div style={{ padding: '32px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: C.surfaceHigh, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                                <User size={28} color={C.textMuted} />
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: '16px', fontWeight: '800', color: C.text, margin: '0 0 8px 0' }}>No Contacts Yet</h3>
+                                <p style={{ fontSize: '13px', color: C.textSub, lineHeight: '1.5', margin: 0 }}>
+                                    Your care team (Doctor & Caregiver) will appear here once they link to this patient.
+                                </p>
+                            </div>
+                            
+                            <div style={{ 
+                                backgroundColor: C.primaryContainer, padding: '16px', borderRadius: '12px', width: '100%', 
+                                border: `1px dashed ${C.primaryLight}`, marginTop: '8px' 
+                            }}>
+                                <span style={{ fontSize: '11px', fontWeight: '700', color: C.primaryLight, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Share Patient ID</span>
+                                <span style={{ fontSize: '18px', fontWeight: '900', color: C.primary, letterSpacing: '1px' }}>
+                                    {patientId?.slice(-8).toUpperCase() || '---'}
+                                </span>
+                            </div>
+                            
+                            <p style={{ fontSize: '12px', color: C.textMuted, fontStyle: 'italic' }}>
+                                Give this ID to your doctor or caretaker so they can join the patient record.
+                            </p>
                         </div>
                     )}
 
@@ -383,15 +417,29 @@ export default function ChatInterface({ currentUser, patientId, userRole }) {
                                                     </div>
                                                 )}
                                                 <div style={{
-                                                    padding: '12px 16px',
+                                                    padding: (msg.type === 'image' || msg.type === 'photo') ? '4px' : '12px 16px',
                                                     borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                                                     backgroundColor: isMe ? C.primary : C.surfaceLowest,
                                                     color: isMe ? 'white' : C.text,
                                                     fontSize: '14px', fontWeight: '500', lineHeight: 1.5,
                                                     boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                                    overflow: 'hidden'
                                                 }}>
-                                                    {msg.type === 'voice' && msg.audioUrl ? (
-                                                        <audio controls src={msg.audioUrl} style={{ height: '36px', width: '220px', marginTop: '4px' }} />
+                                                    {(msg.type === 'voice' || msg.type === 'audio') && (msg.audioUrl || msg.url) ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {msg.message && <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '2px' }}>{msg.message}</div>}
+                                                            <audio controls src={msg.audioUrl || msg.url} style={{ height: '36px', width: '220px' }} />
+                                                        </div>
+                                                    ) : (msg.type === 'image' || msg.type === 'photo' || msg.imageUrl || (msg.url && !msg.audioUrl)) ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <img 
+                                                                src={msg.imageUrl || msg.url} 
+                                                                alt="Attachment" 
+                                                                style={{ maxWidth: '100%', borderRadius: '14px', display: 'block', maxHeight: '300px', objectFit: 'cover' }} 
+                                                                onClick={() => window.open(msg.imageUrl || msg.url, '_blank')}
+                                                            />
+                                                            {msg.message && <div style={{ padding: '8px 12px', fontSize: '13px' }}>{msg.message}</div>}
+                                                        </div>
                                                     ) : (
                                                         msg.message
                                                     )}

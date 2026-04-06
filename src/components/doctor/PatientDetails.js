@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuthContext } from '../../context/AuthContext';
 import { collection, query, where, onSnapshot, doc, addDoc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import ScreenHeader from '../common/ScreenHeader';
@@ -16,6 +17,7 @@ const TABS = ['Overview', 'Vitals', 'Logs', 'Media', 'Prescriptions', 'Care Plan
 
 export default function PatientDetails({ inlinePatientId, onClose }) {
     const navigate = useNavigate();
+    const { user } = useAuthContext();
     const { id: paramId } = useParams();
     const id = inlinePatientId || paramId;
 
@@ -529,7 +531,7 @@ function NotesTab({ clinicalNotes, newNote, setNewNote, onAdd }) {
                 {clinicalNotes.map(n => (
                     <div key={n.id} style={{ backgroundColor: DS.surfaceLowest, borderRadius: '16px', padding: '16px 20px', boxShadow: '0 2px 12px rgba(25,28,30,0.04)' }}>
                         <div style={{ fontSize: '11px', color: DS.textMuted, fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            Dr. Smith · {n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}
+                             {n.authorName || (user?.displayName || 'Dr. Arjun Smith')} · {n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}
                         </div>
                         <p style={{ fontSize: '14px', color: DS.textPrimary, fontWeight: '500', lineHeight: 1.6, margin: 0 }}>{n.note}</p>
                     </div>

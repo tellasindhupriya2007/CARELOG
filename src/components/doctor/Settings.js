@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DS, card, sectionLabel, gradientBtn } from './ds';
+import { useAuthContext } from '../../context/AuthContext';
 import DoctorShell from './DoctorShell';
 import { User, Bell, Shield, LogOut, ChevronRight, Moon, Save } from 'lucide-react';
 
@@ -14,6 +15,7 @@ const TOGGLE_ITEMS = [
 
 export default function DoctorSettings() {
     const navigate = useNavigate();
+    const { user } = useAuthContext();
     const [toggles, setToggles] = useState({ criticalAlerts: true, missedMeds: true, careLogUpdates: false, familyMessages: true, weeklyReport: false });
     const [darkMode, setDarkMode] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -44,19 +46,19 @@ export default function DoctorSettings() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
                             <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: `linear-gradient(135deg, ${DS.secondaryContainer}, ${DS.secondary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '22px', fontWeight: '900' }}>
-                                DR
+                                {user?.email ? user.email[0].toUpperCase() : 'DR'}
                             </div>
                             <div>
-                                <div style={{ fontSize: '20px', fontWeight: '900', color: DS.textPrimary }}>Dr. Smith</div>
-                                <div style={{ fontSize: '13px', color: DS.textMuted, fontWeight: '600' }}>Clinical Director · dr.smith@carelog.health</div>
+                                <div style={{ fontSize: '20px', fontWeight: '900', color: DS.textPrimary }}>{user?.displayName || 'Dr. Arjun Smith'}</div>
+                                <div style={{ fontSize: '13px', color: DS.textMuted, fontWeight: '600' }}>Clinical Practitioner · {user?.email}</div>
                                 <div style={{ fontSize: '12px', color: DS.primaryContainer, fontWeight: '700', marginTop: '2px' }}>License: MCI-2018-04521</div>
                             </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             {[
-                                { label: 'Full Name', value: 'Dr. Arjun Smith' },
+                                { label: 'Full Name', value: user?.displayName || 'Dr. Arjun Smith' },
                                 { label: 'Specialty', value: 'Internal Medicine' },
-                                { label: 'Hospital', value: 'Apollo Medical Center' },
+                                { label: 'Hospital', value: 'CareLog Health Network' },
                                 { label: 'Phone', value: '+91 98765 43210' },
                             ].map((f, i) => (
                                 <div key={i}>

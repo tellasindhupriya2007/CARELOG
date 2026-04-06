@@ -91,25 +91,19 @@ io.on('connection', (socket) => {
      *   2. Confirms delivery back to sender
      */
     socket.on('send_message', (payload) => {
-        const { senderId, receiverId, message, messageId, patientId, senderName, senderRole, timestamp } = payload;
+        const { senderId, receiverId, message, messageId, type } = payload;
 
-        if (!senderId || !receiverId || !message) {
+        if (!senderId || !receiverId || (type === 'text' && !message)) {
             socket.emit('message_error', { error: 'Invalid message payload', messageId });
             return;
         }
 
-        console.log(`[Message] ${senderName || senderId} → ${receiverId}: "${message.slice(0, 40)}"`);
+        console.log(`[Message] ${payload.senderName || senderId} → ${receiverId}: ${type} message`);
 
         const msgPacket = {
-            messageId,
-            senderId,
-            senderName: senderName || senderId,
-            senderRole: senderRole || 'unknown',
-            receiverId,
-            patientId: patientId || null,
-            message,
-            timestamp: timestamp || new Date().toISOString(),
+            ...payload,
             delivered: true,
+            timestamp: payload.timestamp || new Date().toISOString(),
         };
 
         // Deliver to receiver's room

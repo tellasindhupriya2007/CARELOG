@@ -15,9 +15,9 @@ export default function FamilyMessages() {
     const { user, patientId } = useAuthContext();
 
     return (
-        <div style={{ display: 'flex', height: '100vh', backgroundColor: '#F8FAFC' }}>
+        <div className="desktop-layout" style={{ backgroundColor: '#F8FAFC' }}>
             <Sidebar navItems={familySidebarItems} />
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <div className="desktop-content" style={{ display: 'flex', overflow: 'hidden', height: '100vh' }}>
                 <ChatInterface currentUser={user} patientId={patientId} userRole="family" />
             </div>
         </div>

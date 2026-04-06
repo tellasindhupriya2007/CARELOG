@@ -17,7 +17,7 @@ const items = [
 export default function DoctorShell({ children, alertCount = 0 }) {
     const navigate = useNavigate();
     const { pathname } = useLocation();
-    const { logout } = useAuthContext();
+    const { logout, user } = useAuthContext();
 
     return (
         <div style={{ display: 'flex', height: '100vh', fontFamily: "'Inter', sans-serif", overflow: 'hidden', backgroundColor: DS.surface }}>
@@ -79,11 +79,15 @@ export default function DoctorShell({ children, alertCount = 0 }) {
                 <div style={{ padding: '0 12px', borderTop: `1px solid ${DS.outlineVariant}`, paddingTop: '16px', marginTop: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '4px' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: `linear-gradient(135deg, ${DS.secondaryContainer}, ${DS.secondary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: '800', flexShrink: 0 }}>
-                            DR
+                            {user?.displayName ? user.displayName.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'D')}
                         </div>
-                        <div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: DS.textPrimary }}>Dr. Smith</div>
-                            <div style={{ fontSize: '11px', color: DS.textMuted }}>Clinical Director</div>
+                        <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: DS.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {user?.displayName || 'Doctor'}
+                            </div>
+                            <div style={{ fontSize: '10px', color: DS.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {user?.email || 'CareLog Portal'}
+                            </div>
                         </div>
                     </div>
                     <button

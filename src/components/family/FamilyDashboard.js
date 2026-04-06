@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
-import { collection, query, where, onSnapshot, getDoc, doc, setDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDoc, getDocs, updateDoc, doc, setDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getTodayDateString } from '../../utils/dateHelpers';
 import { calculateAndSaveCareScore } from '../../utils/careScoreCalculator';
@@ -16,7 +16,7 @@ import { colors } from '../../styles/colors';
 import { typography } from '../../styles/typography';
 import { spacing } from '../../styles/spacing';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Bell, Pill, HeartPulse, Smile, AlertTriangle, Info, FileText, ChevronRight } from 'lucide-react';
+import { Bell, Pill, HeartPulse, Smile, AlertTriangle, Info, FileText, ChevronRight, Mic, Camera, Users } from 'lucide-react';
 import TaskManager from './TaskManager';
 import { generateWeeklyReport } from '../../services/reportService';
 import { createDefaultWorkflow } from '../../services/taskService';
@@ -88,15 +88,12 @@ export default function FamilyDashboard() {
                 createdAt: serverTimestamp()
             });
 
-            // Update user record with assignedPatientId
             await setDoc(doc(db, 'users', user.uid), { 
                 assignedPatientId: newPatRef.id,
                 role: 'family' 
             }, { merge: true });
 
-            // AUTO-GENERATE CLINICAL CHECKLIST
             await createDefaultWorkflow(newPatRef.id);
-
             setPatientId(newPatRef.id);
             setPatientName(name);
             setPatientHumanId(hId);
@@ -106,6 +103,35 @@ export default function FamilyDashboard() {
         }
         setCreating(false);
     };
+
+    const handleLinkProfile = async (humanId) => {
+        if (!humanId) return;
+        setCreating(true);
+        try {
+            const q = query(collection(db, 'patients'), where('patientId', '==', humanId.trim().toUpperCase()));
+            const snap = await getDocs(q);
+            if (snap.empty) {
+                alert("Patient ID not found.");
+            } else {
+                const pDoc = snap.docs[0];
+                const pId = pDoc.id;
+                
+                await updateDoc(doc(db, 'patients', pId), { familyId: user.uid });
+                await setDoc(doc(db, 'users', user.uid), { assignedPatientId: pId, role: 'family' }, { merge: true });
+                
+                setPatientId(pId);
+                setPatientName(pDoc.data().name);
+                setPatientHumanId(pDoc.data().patientId);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to link profile.");
+        }
+        setCreating(false);
+    };
+
+    const [setupMode, setSetupMode] = useState('create'); // 'create' or 'link'
+    const [setupInput, setSetupInput] = useState('');
 
     // 2. Fetch dailyLogs and alerts
     useEffect(() => {
@@ -231,10 +257,14 @@ export default function FamilyDashboard() {
 
         data.observations?.forEach((obs, i) => {
             activities.push({
-                id: `obs-${i}`, text: obs.isCritical ? "Critical Observation" : "Logged Observation",
+                id: `obs-${i}`, 
+                text: obs.isCritical ? "Critical Observation" : "Logged Observation",
                 timeStr: new Date(obs.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 timestamp: new Date(obs.recordedAt).getTime(),
-                type: obs.isCritical ? 'alert' : 'success', caretaker: obs.caretakerName || 'Caretaker'
+                type: obs.isCritical ? 'alert' : 'success', 
+                caretaker: obs.caretakerName || 'Caretaker',
+                hasVoice: obs.hasVoice,
+                hasImage: obs.hasImage
             });
         });
 
@@ -332,24 +362,36 @@ export default function FamilyDashboard() {
                     {error ? (
                         <ErrorCard message={error} />
                     ) : !patientId && !loading ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '24px' }}>
                             <div style={{ textAlign: 'center' }}>
-                                <h2 style={{ fontSize: '24px', fontWeight: '800', color: colors.textPrimary }}>Setup Patient Profile</h2>
-                                <p style={{ color: colors.textSecondary }}>Create a profile for your family member to start monitoring.</p>
+                                <div style={{ width: '64px', height: '64px', borderRadius: '20px', backgroundColor: colors.lightBlue, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                    <Users size={32} color={colors.primaryBlue} />
+                                </div>
+                                <h1 style={{ fontSize: '28px', fontWeight: '900', color: colors.textPrimary, margin: '0 0 8px', letterSpacing: '-0.5px' }}>Patient Setup</h1>
+                                <p style={{ fontSize: '15px', color: colors.textSecondary, maxWidth: '400px', margin: '0 auto' }}>
+                                    {setupMode === 'create' ? 'Start fresh with a new clinical care profile.' : 'Connect to a profile already created by your doctor.'}
+                                </p>
                             </div>
+
+                            <div style={{ display: 'flex', backgroundColor: colors.white, padding: '4px', borderRadius: '12px', border: `1px solid ${colors.border}`, marginBottom: '12px' }}>
+                                <button onClick={() => { setSetupMode('create'); setSetupInput(''); }} style={{ padding: '10px 24px', borderRadius: '10px', border: 'none', backgroundColor: setupMode === 'create' ? colors.primaryBlue : 'transparent', color: setupMode === 'create' ? 'white' : colors.textSecondary, fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}>Create New</button>
+                                <button onClick={() => { setSetupMode('link'); setSetupInput(''); }} style={{ padding: '10px 24px', borderRadius: '10px', border: 'none', backgroundColor: setupMode === 'link' ? colors.primaryBlue : 'transparent', color: setupMode === 'link' ? 'white' : colors.textSecondary, fontSize: '14px', fontWeight: '800', cursor: 'pointer' }}>Link via ID</button>
+                            </div>
+
                             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <input 
                                     type="text" 
-                                    placeholder="Patient's Full Name"
-                                    id="patientNameInput"
-                                    style={{ width: '100%', padding: '16px', borderRadius: '12px', border: `2px solid ${colors.border}`, fontSize: '16px' }}
+                                    placeholder={setupMode === 'create' ? "Patient's Full Name" : "CL-YYYY-XXXX"}
+                                    value={setupInput}
+                                    onChange={(e) => setSetupInput(setupMode === 'link' ? e.target.value.toUpperCase() : e.target.value)}
+                                    style={{ width: '100%', padding: '16px', borderRadius: '14px', border: `2.5px solid ${colors.border}`, fontSize: '16px', fontWeight: '700', boxSizing: 'border-box' }}
                                 />
                                 <button 
-                                    onClick={() => handleCreateProfile(document.getElementById('patientNameInput').value)}
+                                    onClick={() => setupMode === 'create' ? handleCreateProfile(setupInput) : handleLinkProfile(setupInput)}
                                     disabled={creating}
-                                    style={{ width: '100%', padding: '16px', backgroundColor: colors.primaryBlue, color: 'white', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}
+                                    style={{ width: '100%', padding: '18px', backgroundColor: colors.primaryBlue, color: 'white', border: 'none', borderRadius: '14px', fontWeight: '900', cursor: 'pointer', fontSize: '16px', boxShadow: `0 8px 16px ${colors.primaryBlue}30` }}
                                 >
-                                    {creating ? 'Creating...' : 'Create Profile'}
+                                    {creating ? 'Processing...' : (setupMode === 'create' ? 'Generate Profile' : 'Verify & Link')}
                                 </button>
                             </div>
                         </div>
@@ -408,9 +450,15 @@ export default function FamilyDashboard() {
                                             timeline.slice(0, 3).map((act) => (
                                                 <div key={act.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                                                     <div style={{ marginTop: '5px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: act.type === 'alert' ? colors.alertRed : colors.primaryGreen }} />
-                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                                        <span style={{ fontSize: '13px', fontWeight: '600', color: colors.textPrimary, lineHeight: '1.2' }}>{act.text}</span>
-                                                        <span style={{ fontSize: '11px', color: colors.textSecondary }}>{act.caretaker} • {act.timeStr}</span>
+                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontSize: '13px', fontWeight: '600', color: colors.textPrimary, lineHeight: '1.2' }}>{act.text}</span>
+                                                            <span style={{ fontSize: '11px', color: colors.textSecondary }}>{act.caretaker} • {act.timeStr}</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            {act.hasVoice && <Mic size={14} color={colors.primaryBlue} />}
+                                                            {act.hasImage && <Camera size={14} color={colors.primaryBlue} />}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))

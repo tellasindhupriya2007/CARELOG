@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as SocketService from '../../services/socketService';
 import { collection, query, where, getDocs, updateDoc, doc, setDoc, serverTimestamp, addDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase/config';
@@ -166,13 +167,60 @@ export default function ObservationsScreen() {
     };
 
 
-    const handleImageSelect = (e) => {
+    const compressImage = (file) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1080;
+                    const MAX_HEIGHT = 1080;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Quality 0.7 is a good balance for clinical detail vs size
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    resolve(dataUrl);
+                };
+            };
+        });
+    };
+
+    const handleImageSelect = async (e) => {
         const file = e.target.files[0];
         if (file) {
-            setSelectedImage(file);
-            const reader = new FileReader();
-            reader.onloadend = () => setImagePreview(reader.result);
-            reader.readAsDataURL(file);
+            setSubmitting(true);
+            try {
+                const compressedDataUrl = await compressImage(file);
+                setImagePreview(compressedDataUrl);
+                // Convert compressed dataUrl back to a small file/blob if needed, 
+                // but we'll use the compressedDataUrl string directly for dev stability.
+                setSelectedImage(compressedDataUrl); 
+            } catch (err) {
+                console.error("Compression failed", err);
+            } finally {
+                setSubmitting(false);
+            }
         }
     };
 
@@ -210,90 +258,95 @@ export default function ObservationsScreen() {
         }
         setSubmitting(true);
         try {
-            let finalAudioUrl = "";
+            // 1. Prepare Base64 Data (CORS-immune binary transmission)
+            let finalAudioData = "";
             if (audioBlob) {
-                try {
-                    const audioRefTarget = ref(storage, `patients/${patientId}/recordings/${Date.now()}.webm`);
-                    await Promise.race([
-                        uploadBytes(audioRefTarget, audioBlob),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error("Storage timeout")), 8000))
-                    ]);
-                    finalAudioUrl = await getDownloadURL(audioRefTarget);
-                } catch (err) {
-                    console.error("Audio upload failed:", err);
-                    alert("Audio upload failed or timed out. Observation will be saved without audio.");
-                    finalAudioUrl = ""; // Proceed without audio to not lock the UI
+                finalAudioData = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(audioBlob);
+                });
+            }
+
+            let finalImageData = "";
+            if (selectedImage) {
+                if (typeof selectedImage === 'string') {
+                    finalImageData = selectedImage;
+                } else {
+                    finalImageData = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(selectedImage);
+                    });
                 }
             }
 
-            // Handle Image Upload via service
-            if (selectedImage) {
-                await uploadPatientMedia(patientId, selectedImage, mood || "Clinical Photo", user.uid);
-            }
-
+            // 2. Save Clinical Metadata to Firestore (Lightweight record)
             const todayString = getTodayDateString();
-            const logRef = await Promise.race([
-                getDayLogRef(todayString),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout getting log reference")), 5000))
-            ]);
-
+            const logRef = await getDayLogRef(todayString);
+            
             const newObservation = {
                 mood: mood || null,
-                audioUrl: finalAudioUrl || null,
+                hasVoice: !!audioBlob,
                 hasImage: !!selectedImage,
                 isCritical: !!isCritical,
-                caretakerName: caretakerName || 'Caretaker',
+                caretakerName: caretakerName || 'Caregiver',
                 recordedAt: new Date().toISOString()
             };
 
-            await Promise.race([
-                updateDoc(logRef, {
-                    observations: arrayUnion(newObservation)
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout saving observation")), 5000))
-            ]);
+            // Save basic metadata to avoid Firestore document limits
+            await updateDoc(logRef, {
+                observations: arrayUnion(newObservation)
+            });
 
             try {
                 await checkCriticalObservationAndAlert(patientId, newObservation);
             } catch (e) {
-                console.error("Alert trigger failed, continuing...", e);
+                console.error("Alert trigger failed", e);
             }
 
-            // Send voice message to family members if an audio clip exists
-            if (finalAudioUrl) {
-                try {
-                    const pDoc = await getDoc(doc(db, 'patients', patientId));
-                    if (pDoc.exists()) {
-                        const patData = pDoc.data();
-                        const familyIds = patData.familyIds || (patData.familyId ? [patData.familyId] : []);
-                        for (const fId of familyIds) {
-                            try {
-                                await addDoc(collection(db, 'messages'), {
-                                    patientId,
-                                    senderId: user.uid,
-                                    senderName: caretakerName || 'Caretaker',
-                                    senderRole: 'Caretaker',
-                                    receiverId: fId,
-                                    type: 'voice',
-                                    message: 'Clinical Voice Log',
-                                    audioUrl: finalAudioUrl,
-                                    timestamp: serverTimestamp(),
-                                    isRead: false
-                                });
-                            } catch (e) {
-                                console.error("Failed to send to family member", e);
-                            }
-                        }
+            // 3. Send Real-time Socket Message to Family
+            const pDoc = await getDoc(doc(db, 'patients', patientId));
+            if (pDoc.exists()) {
+                const patData = pDoc.data();
+                const familyIds = patData.familyIds || (patData.familyId ? [patData.familyId] : []);
+                for (const fId of familyIds) {
+                    if (finalAudioData) {
+                        await SocketService.sendMessage({
+                            patientId,
+                            senderId: user.uid,
+                            senderName: caretakerName || 'Caregiver',
+                            senderRole: 'Caretaker',
+                            receiverId: fId,
+                            type: 'voice',
+                            message: 'Clinical Voice Log',
+                            audioUrl: finalAudioData
+                        });
                     }
-                } catch (e) {
-                    console.error("Failed to fetch family members", e);
+                    if (finalImageData) {
+                        await SocketService.sendMessage({
+                            patientId,
+                            senderId: user.uid,
+                            senderName: caretakerName || 'Caregiver',
+                            senderRole: 'Caretaker',
+                            receiverId: fId,
+                            type: 'image',
+                            message: 'Patient Photo Attachment',
+                            imageUrl: finalImageData
+                        });
+                    }
                 }
             }
 
-            showToast('Observation recorded successfully!', 'success');
-        } catch (error) {
-            console.error("HandleSave encountered an error/timeout:", error);
-            alert('Network timeout or error. Please refresh and try again.');
+            // Success & Cleanup
+            setAudioBlob(null);
+            setSelectedImage(null);
+            setImagePreview(null);
+            showToast('Observation recorded and shared with family', 'success');
+        } catch (err) {
+            console.error("Save failed:", err);
+            alert("Could not save observation. Check your connection.");
+        } finally {
             setSubmitting(false);
         }
     };
@@ -426,22 +479,27 @@ export default function ObservationsScreen() {
                                     }}>
                                         <Camera size={20} color={colors.primaryBlue} />
                                     </div>
-                                    <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary }}>CAPTURE IMAGE</span>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary }}>CLINICAL PHOTO</span>
                                     <input type="file" accept="image/*" capture="environment" onChange={handleImageSelect} style={{ display: 'none' }} />
                                 </label>
                             ) : (
-                                <div style={{ position: 'relative', width: '40px', height: '40px' }}>
-                                    <img src={imagePreview} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} alt="Preview" />
+                                <div style={{ position: 'relative', width: '56px', height: '56px' }}>
+                                    <img src={imagePreview} style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover', border: `1px solid ${colors.border}` }} alt="Preview" />
                                     <button 
                                         onClick={removeImage}
-                                        style={{ position: 'absolute', top: '-6px', right: '-6px', backgroundColor: colors.alertRed, color: 'white', border: 'none', borderRadius: '50%', padding: '2px' }}
+                                        style={{ 
+                                            position: 'absolute', top: '-8px', right: '-8px', 
+                                            backgroundColor: colors.white, color: colors.textPrimary, 
+                                            border: `1px solid ${colors.border}`, borderRadius: '50%', 
+                                            width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)', cursor: 'pointer'
+                                        }}
                                     >
-                                        <X size={10} />
+                                        <X size={12} strokeWidth={3} />
                                     </button>
-                                    <span style={{ fontSize: '10px', marginTop: '4px', display: 'block', textAlign: 'center', color: colors.primaryGreen }}>READY</span>
+                                    <span style={{ fontSize: '9px', marginTop: '4px', display: 'block', textAlign: 'center', color: colors.primaryGreen, fontWeight: '800' }}>READY</span>
                                 </div>
                             )}
-                            {!imagePreview && <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary }}>CLINICAL PHOTO</span>}
                         </div>
                     </div>
                 </div>

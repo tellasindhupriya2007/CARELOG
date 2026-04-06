@@ -76,10 +76,11 @@ export const disconnectSocket = () => {
  * 1. Saves to Firestore (persists regardless of socket state)
  * 2. Emits via Socket.IO for instant delivery if connected
  */
-export const sendMessage = async ({ senderId, senderName, senderRole, receiverId, patientId, message, type = 'text', audioUrl = null, duration = null }) => {
+export const sendMessage = async ({ senderId, senderName, senderRole, receiverId, patientId, message, type = 'text', audioUrl = null, imageUrl = null, duration = null }) => {
     if (!senderId || !receiverId) throw new Error('Invalid message params');
     if (type === 'text' && !message?.trim()) throw new Error('Text message cannot be empty');
     if (type === 'voice' && !audioUrl) throw new Error('Voice message requires audioUrl');
+    if (type === 'image' && !imageUrl) throw new Error('Image message requires imageUrl');
 
     // 1. Persist to Firestore
     const docRef = await addDoc(collection(db, 'messages'), {
@@ -89,8 +90,9 @@ export const sendMessage = async ({ senderId, senderName, senderRole, receiverId
         receiverId,
         patientId: patientId || null,
         type,
-        message: type === 'text' ? message.trim() : '',
+        message: message?.trim() || '',
         audioUrl,
+        imageUrl,
         duration,
         timestamp: serverTimestamp(),
         isRead: false,
@@ -99,16 +101,8 @@ export const sendMessage = async ({ senderId, senderName, senderRole, receiverId
     // 2. Emit via Socket.IO (best-effort, no throw on failure)
     if (socket?.connected) {
         socket.emit('send_message', {
+            ...({ senderId, senderName, senderRole, receiverId, patientId, message, type, audioUrl, imageUrl, duration }),
             messageId: docRef.id,
-            senderId,
-            senderName,
-            senderRole,
-            receiverId,
-            patientId,
-            type,
-            message: type === 'text' ? message.trim() : '',
-            audioUrl,
-            duration,
             timestamp: new Date().toISOString(),
         });
     }

@@ -6,9 +6,10 @@
 
 import {
     collection, addDoc, doc, getDoc, getDocs, updateDoc,
-    query, where, onSnapshot, serverTimestamp, orderBy, limit
+    query, where, onSnapshot, serverTimestamp, orderBy, limit, arrayUnion
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { generatePatientId } from '../utils/idGenerator';
 
 // ─── Collection reference ─────────────────────────────────
 const PATIENTS = 'patients';
@@ -17,10 +18,10 @@ const PATIENTS = 'patients';
 
 /**
  * Create a new patient.
- * Returns the Firestore-generated patientId.
+ * Returns the Firestore-generated patientId (auto-ID).
  *
  * @param {Object} data  Patient fields from the form
- * @returns {string} patientId
+ * @returns {string} patientId (Firestore auto-ID)
  */
 export const createPatient = async ({
     name,
@@ -41,7 +42,12 @@ export const createPatient = async ({
 }) => {
     if (!name?.trim()) throw new Error('Patient name is required.');
 
+    const humanId = generatePatientId(); // CL-YYYY-XXXX
+
     const ref = await addDoc(collection(db, PATIENTS), {
+        // Human ID for display and linking
+        patientId: humanId,
+
         // Identity
         name: name.trim(),
         age: Number(age) || null,
@@ -62,10 +68,11 @@ export const createPatient = async ({
         // Location
         address: address || '',
 
-        // Relations  ← link to logged-in user IDs
+        // Relations
         doctorId: doctorId || null,
         caregiverId: caregiverId || null,
         familyId: familyId || null,
+        caretakerIds: caregiverId ? [caregiverId] : [], // Multiple support
 
         // Meta
         status: 'active',
@@ -73,7 +80,7 @@ export const createPatient = async ({
         updatedAt: serverTimestamp(),
     });
 
-    return ref.id; // ← Firestore auto-generated patientId
+    return ref.id; // Returns doc.id (long string)
 };
 
 // ─── READ ─────────────────────────────────────────────────
@@ -105,7 +112,8 @@ export const subscribeToDoctorPatients = (doctorId, callback) => {
 /** Live-subscribe to patients for a caregiver. */
 export const subscribeToCaregiverPatients = (caregiverId, callback) => {
     if (!caregiverId) return () => {};
-    const q = query(collection(db, PATIENTS), where('caregiverId', '==', caregiverId));
+    // Check either single caregiverId or multiple caretakerIds array
+    const q = query(collection(db, PATIENTS), where('caretakerIds', 'array-contains', caregiverId));
     return onSnapshot(q, (snap) => {
         callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -131,13 +139,33 @@ export const updatePatient = async (patientId, fields) => {
     });
 };
 
+/** Link a doctor to an existing patient profile by its Firestore ID. */
+export const assignDoctor = (patientId, doctorId) =>
+    updatePatient(patientId, { doctorId });
+
 /** Assign a caregiver to an existing patient. */
 export const assignCaregiver = (patientId, caregiverId) =>
-    updatePatient(patientId, { caregiverId });
+    updatePatient(patientId, { caregiverId, caretakerIds: arrayUnion(caregiverId) });
 
 /** Assign a family member to an existing patient. */
 export const assignFamily = (patientId, familyId) =>
     updatePatient(patientId, { familyId });
+
+/** Link to a patient via their human-readable Patient ID (CL-XXXX). */
+export const linkById = async (humanId, userId, role) => {
+    const q = query(collection(db, PATIENTS), where('patientId', '==', humanId.toUpperCase()));
+    const snap = await getDocs(q);
+    if (snap.empty) throw new Error('Invalid Patient ID. Not found.');
+    
+    const pDoc = snap.docs[0];
+    const update = {};
+    if (role === 'doctor') update.doctorId = userId;
+    if (role === 'family') update.familyId = userId;
+    if (role === 'caretaker') update.caretakerIds = arrayUnion(userId);
+    
+    await updateDoc(doc(db, PATIENTS, pDoc.id), update);
+    return pDoc.id;
+};
 
 // ─── SEED ────────────────────────────────────────────────
 

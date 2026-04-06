@@ -17,9 +17,11 @@ export default function CaretakerMessages() {
     const { user, patientId } = useAuthContext();
 
     return (
-        <div style={{ display: 'flex', height: '100vh', backgroundColor: '#F8FAFC' }}>
+        <div className="desktop-layout" style={{ backgroundColor: '#F8FAFC' }}>
             <Sidebar navItems={sidebarItems} />
-            <ChatInterface currentUser={user} patientId={patientId} userRole="caretaker" />
+            <div className="desktop-content" style={{ display: 'flex', overflow: 'hidden', height: '100vh' }}>
+                <ChatInterface currentUser={user} patientId={patientId} userRole="caretaker" />
+            </div>
         </div>
     );
 }
