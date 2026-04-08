@@ -20,15 +20,16 @@ export const generateWeeklyReport = async (patientId, patientName, action = 'dow
     } catch (e) { /* non-fatal — continue without bio */ }
 
     // ── 2. Fetch Clinical Data ────────────────────────────────────
-    // No orderBy — avoids composite index. Sorted client-side.
-    const vitalsSnap = await getDocs(query(collection(db, 'vitals'), where('patientId', '==', patientId), limit(50)));
+    // Fetch from standardized 'vitals' collection
+    const vitalsSnap = await getDocs(query(collection(db, 'vitals'), where('patientId', '==', patientId), limit(100)));
     const vitalsData = vitalsSnap.docs.map(d => d.data()).sort((a, b) => {
-        const ta = a.timestamp?.toDate?.() || new Date(a.timestamp || 0);
-        const tb = b.timestamp?.toDate?.() || new Date(b.timestamp || 0);
+        // Use recordedAt (serverTimestamp) for reliable sorting
+        const ta = a.recordedAt?.toDate?.() || new Date(a.recordedAt || 0);
+        const tb = b.recordedAt?.toDate?.() || new Date(b.recordedAt || 0);
         return tb - ta;
     });
 
-    const alertsSnap = await getDocs(query(collection(db, 'alerts'), where('patientId', '==', patientId), limit(20)));
+    const alertsSnap = await getDocs(query(collection(db, 'alerts'), where('patientId', '==', patientId), limit(25)));
     const alertsData = alertsSnap.docs.map(d => d.data()).sort((a, b) => {
         const ta = a.timestamp?.toDate?.() || new Date(a.timestamp || 0);
         const tb = b.timestamp?.toDate?.() || new Date(b.timestamp || 0);
@@ -109,8 +110,8 @@ export const generateWeeklyReport = async (patientId, patientName, action = 'dow
     y += 4;
 
     const vitalsRows = vitalsData.map(v => [
-        v.timestamp?.toDate ? v.timestamp.toDate().toLocaleString() : 'N/A',
-        `${v.bloodPressure?.systolic || v.bpSystolic || '--'}/${v.bloodPressure?.diastolic || v.bpDiastolic || '--'} mmHg`,
+        v.recordedAt?.toDate ? v.recordedAt.toDate().toLocaleString() : 'N/A',
+        `${v.bp?.systolic || v.bpSystolic || '--'}/${v.bp?.diastolic || v.bpDiastolic || '--'} mmHg`,
         `${v.heartRate || '--'} bpm`,
         `${v.temperature || '--'}°C`,
     ]);

@@ -1,7 +1,11 @@
 import { triggerAlert } from '../services/alertService';
 
 export const checkVitalsAndCreateAlert = async (patientId, vitalsData, patientDetails) => {
-    const { bpSystolic, bpDiastolic, heartRate, temperature } = vitalsData;
+    // Standardized schema: { bp: { systolic, diastolic }, heartRate, temperature }
+    const { bp, heartRate, temperature } = vitalsData;
+    const bpSystolic = bp?.systolic;
+    const bpDiastolic = bp?.diastolic;
+    
     let anyAlert = false;
 
     // A. VITALS

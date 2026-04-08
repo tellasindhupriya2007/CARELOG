@@ -10,6 +10,15 @@ export default function BottomNav({ navItems }) {
     return (
         <div className="bottom-nav" style={{
             backgroundColor: colors.white,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-around',
+            height: '64px',
+            borderTop: `1px solid ${colors.border}`,
+            padding: '0 8px',
+            boxSizing: 'border-box',
+            width: '100%',
         }}>
             {navItems.map((item, index) => {
                 const isActive = location.pathname.startsWith(item.path);

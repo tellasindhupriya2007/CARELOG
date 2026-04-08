@@ -14,14 +14,12 @@ export default function DoctorReports() {
     const [filter, setFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Alert count subscription for DoctorShell
     useEffect(() => {
         if (!user?.uid) return;
         const q = query(collection(db, 'alerts'), where('isRead', '==', false), where('doctorId', '==', user.uid));
         return onSnapshot(q, s => setAlertCount(s.size));
     }, [user?.uid]);
 
-    // Fetch My Reports
     useEffect(() => {
         if (!user?.uid) return;
         setLoading(true);
@@ -54,7 +52,7 @@ export default function DoctorReports() {
 
     const handleDownload = (report) => {
         if (!report.fileUrl || report.fileUrl === '#') {
-            alert(`Report is still processing or not found.`);
+            alert(`Diagnostic artifact is still synchronizing.`);
             return;
         }
         window.open(report.fileUrl, '_blank');
@@ -62,55 +60,59 @@ export default function DoctorReports() {
 
     return (
         <DoctorShell alertCount={alertCount}>
-            <div style={{ flex: 1, overflowY: 'auto', backgroundColor: DS.surface, padding: '32px' }}>
-                <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+            <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#F8FAFC', padding: '40px' }}>
+                <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                     
                     {/* Header Section */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' }}>
-                        <div>
-                            <h1 style={{ fontSize: '32px', fontWeight: '900', color: DS.textPrimary, margin: '0 0 8px 0', letterSpacing: '-0.8px' }}>Reports Library</h1>
-                            <p style={{ fontSize: '15px', color: DS.textMuted, fontWeight: '500', margin: 0 }}>Review clinical summaries and generated health insights.</p>
+                    <div style={{ marginBottom: '40px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                            <div style={{ width: '40px', height: '1px', backgroundColor: '#0052FF' }}></div>
+                            <span style={{ fontSize: '13px', fontWeight: '900', color: '#0052FF', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Medical Record Archive</span>
                         </div>
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                             <div style={{ position: 'relative' }}>
-                                <Search size={14} color={DS.textMuted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h1 style={{ fontSize: '36px', fontWeight: '900', color: '#101828', margin: '0 0 12px 0', letterSpacing: '-1.5px' }}>Clinical Reports</h1>
+                                <p style={{ fontSize: '16px', color: '#475467', fontWeight: '600' }}>Review longitudinal summaries and machine-generated insights.</p>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <Search size={16} color="#98A2B3" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                                 <input 
-                                    placeholder="Search reports..."
+                                    placeholder="Search documents..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     style={{
-                                        padding: '10px 12px 10px 36px', borderRadius: '12px',
-                                        border: `1px solid ${DS.outlineVariant}`, backgroundColor: 'white',
-                                        fontSize: '13px', outline: 'none', width: '220px', fontFamily: 'inherit'
+                                        padding: '14px 16px 14px 44px', borderRadius: '16px',
+                                        border: '1px solid #EAECF0', backgroundColor: '#ffffff',
+                                        fontSize: '14px', outline: 'none', width: '280px', fontFamily: 'inherit',
+                                        boxShadow: '0 1px 2px rgba(16, 24, 40, 0.05)'
                                     }}
                                 />
-                             </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Patient Quick Filter */}
+                    {/* Quick Filters */}
                     {uniquePatients.length > 0 && (
-                        <div style={{ marginBottom: '28px' }}>
-                            <div style={{ fontSize: '12px', fontWeight: '800', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Filter size={12} /> Filter by Patient
-                            </div>
+                        <div style={{ marginBottom: '32px' }}>
                             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
                                 <button onClick={() => setFilter('All')} style={{
-                                    padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                                    fontSize: '13px', fontWeight: '700', transition: 'all 0.2s',
-                                    backgroundColor: filter === 'All' ? DS.primaryContainer : 'white',
-                                    color: filter === 'All' ? 'white' : DS.textSecondary,
-                                    border: filter === 'All' ? 'none' : `1px solid ${DS.outlineVariant}`
+                                    padding: '10px 20px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                                    fontSize: '13px', fontWeight: '800', transition: 'all 0.2s',
+                                    backgroundColor: filter === 'All' ? '#0052FF' : '#ffffff',
+                                    color: filter === 'All' ? '#ffffff' : '#475467',
+                                    border: filter === 'All' ? '1px solid #0052FF' : '1px solid #EAECF0',
+                                    boxShadow: filter === 'All' ? '0 4px 12px rgba(0, 82, 255, 0.2)' : 'none'
                                 }}>
                                     All Patients
                                 </button>
                                 {uniquePatients.map(p => (
                                     <button key={p.id} onClick={() => setFilter(p.id)} style={{
-                                        padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                                        fontSize: '13px', fontWeight: '700', transition: 'all 0.2s', whiteSpace: 'nowrap',
-                                        backgroundColor: filter === p.id ? DS.primaryContainer : 'white',
-                                        color: filter === p.id ? 'white' : DS.textSecondary,
-                                        border: filter === p.id ? 'none' : `1px solid ${DS.outlineVariant}`
+                                        padding: '10px 20px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                                        fontSize: '13px', fontWeight: '800', transition: 'all 0.2s', whiteSpace: 'nowrap',
+                                        backgroundColor: filter === p.id ? '#0052FF' : '#ffffff',
+                                        color: filter === p.id ? '#ffffff' : '#475467',
+                                        border: filter === p.id ? '1px solid #0052FF' : '1px solid #EAECF0',
+                                        boxShadow: filter === p.id ? '0 4px 12px rgba(0, 82, 255, 0.2)' : 'none'
                                     }}>
                                         {p.name}
                                     </button>
@@ -119,68 +121,70 @@ export default function DoctorReports() {
                         </div>
                     )}
 
-                    {/* Reports Inventory */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Inventory */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {loading ? (
-                            [1,2,3].map(i => <div key={i} style={{ height: '88px', backgroundColor: '#F1F5F9', borderRadius: '18px', animation: 'pulse 1.5s infinite' }} />)
+                            [1,2,3].map(i => <div key={i} style={{ height: '100px', backgroundColor: '#F2F4F7', borderRadius: '24px', animation: 'pulse 1.5s infinite' }} />)
                         ) : filtered.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '80px 20px', backgroundColor: 'white', borderRadius: '24px', border: `1px dashed ${DS.outlineVariant}` }}>
-                                <FileText size={48} color={DS.surfaceHigh} style={{ margin: '0 auto 16px', display: 'block' }} />
-                                <h3 style={{ fontSize: '18px', fontWeight: '800', color: DS.textPrimary, margin: '0 0 8px 0' }}>No reports found</h3>
-                                <p style={{ fontSize: '14px', color: DS.textMuted, maxWidth: '300px', margin: '0 auto' }}> {searchQuery || filter !== 'All' ? "Try adjusting your filters or search terms." : "Generated reports will appear here once clinical summaries are completed."}</p>
+                            <div style={{ textAlign: 'center', padding: '80px 40px', backgroundColor: '#ffffff', borderRadius: '32px', border: '1px dashed #EAECF0' }}>
+                                <FileText size={56} color="#98A2B3" strokeWidth={1.5} style={{ margin: '0 auto 24px', display: 'block' }} />
+                                <div style={{ fontSize: '20px', fontWeight: '900', color: '#101828', marginBottom: '8px' }}>Archive Repository Empty</div>
+                                <div style={{ fontSize: '15px', color: '#475467', fontWeight: '600' }}> {searchQuery || filter !== 'All' ? "Try adjusting your clinical filters or document search terms." : "Generated reports will synchronize here once clinical sessions are archived."}</div>
                             </div>
                         ) : (
                             filtered.map(report => (
                                 <div key={report.id} style={{ 
-                                    backgroundColor: 'white', padding: '18px 24px', borderRadius: '18px', 
+                                    backgroundColor: '#ffffff', padding: '24px 32px', borderRadius: '24px', 
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.03)', border: `1px solid ${DS.outlineVariant}`,
-                                    transition: 'transform 0.2s'
-                                }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                                    <div style={{ display: 'flex', gap: '18px', alignItems: 'center', flex: 1 }}>
+                                    boxShadow: '0 4px 12px rgba(16, 24, 40, 0.02)', border: '1px solid #EAECF0',
+                                    transition: 'all 0.2s'
+                                }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(16, 24, 40, 0.05)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 24, 40, 0.02)'; }}>
+                                    <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flex: 1 }}>
                                         <div style={{ 
-                                            width: '52px', height: '52px', borderRadius: '14px', 
-                                            backgroundColor: report.status === 'Ready' ? '#EEF2FF' : '#FEF3C7', 
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 
+                                            width: '56px', height: '56px', borderRadius: '18px', 
+                                            backgroundColor: report.status === 'Ready' ? '#EFF4FF' : '#FFFAEB', 
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                            border: `1px solid ${report.status === 'Ready' ? '#0052FF20' : '#DC680320'}`
                                         }}>
-                                            <FileText size={24} color={report.status === 'Ready' ? DS.primaryContainer : DS.warning} />
+                                            <FileText size={28} color={report.status === 'Ready' ? '#0052FF' : '#DC6803'} />
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: '16px', fontWeight: '800', color: DS.textPrimary, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{report.title}</div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: '700', color: DS.primaryContainer }}>
-                                                    <User size={12} /> {report.patientName}
+                                            <div style={{ fontSize: '18px', fontWeight: '900', color: '#101828', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{report.title}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '800', color: '#0052FF' }}>
+                                                    <User size={14} /> {report.patientName}
                                                 </span>
-                                                <span style={{ fontSize: '12px', color: DS.textMuted }}>·</span>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: DS.textMuted, fontWeight: '600' }}>
-                                                    <Calendar size={12} /> {report.period}
+                                                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#D0D5DD' }}></div>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#667085', fontWeight: '700' }}>
+                                                    <Calendar size={14} /> {report.period}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                         <div style={{ 
-                                            padding: '6px 12px', borderRadius: '8px', fontSize: '10px', fontWeight: '900', 
-                                            textTransform: 'uppercase', letterSpacing: '0.4px',
-                                            backgroundColor: report.status === 'Ready' ? '#DCFCE7' : '#FEF3C7',
-                                            color: report.status === 'Ready' ? DS.success : DS.warning, marginRIght: '12px'
+                                            padding: '6px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: '900', 
+                                            textTransform: 'uppercase', letterSpacing: '0.8px',
+                                            backgroundColor: report.status === 'Ready' ? '#ECFDF5' : '#FFFAEB',
+                                            color: report.status === 'Ready' ? '#079455' : '#DC6803',
+                                            border: `1px solid ${report.status === 'Ready' ? '#07945520' : '#DC680320'}`
                                         }}>
                                             {report.status}
                                         </div>
                                         
                                         {report.status === 'Ready' && (
-                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                <button onClick={() => handleDownload(report)} title="View" style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', backgroundColor: '#F8FAFC', color: DS.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#EEF2FF'} onMouseLeave={e => e.currentTarget.style.backgroundColor = '#F8FAFC'}>
-                                                    <Eye size={18} />
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button onClick={() => handleDownload(report)} style={{ width: '44px', height: '44px', borderRadius: '14px', border: '1px solid #EAECF0', backgroundColor: '#ffffff', color: '#475467', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                                    <Eye size={20} />
                                                 </button>
-                                                <button onClick={() => handleDownload(report)} title="Download" style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', backgroundColor: DS.primaryContainer, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: `0 4px 12px ${DS.primaryContainer}30` }}>
-                                                    <Download size={18} />
+                                                <button onClick={() => handleDownload(report)} style={{ height: '44px', padding: '0 20px', borderRadius: '14px', border: 'none', backgroundColor: '#0052FF', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '8px', fontWeight: '800', fontSize: '13px', boxShadow: '0 4px 12px rgba(0, 82, 255, 0.2)' }}>
+                                                    <Download size={18} /> Download
                                                 </button>
                                             </div>
                                         )}
                                         {report.status !== 'Ready' && (
-                                            <span style={{ fontSize: '12px', fontWeight: '700', color: DS.warning, width: '86px', textAlign: 'center' }}>Generating...</span>
+                                            <span style={{ fontSize: '13px', fontWeight: '800', color: '#DC6803', width: '100px', textAlign: 'center' }}>Syncing...</span>
                                         )}
                                     </div>
                                 </div>

@@ -115,6 +115,7 @@ export default function DoctorMessages() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     {activePatient ? (
                         <ChatInterface 
+                            key={activePatient.id}
                             currentUser={user} 
                             patientId={activePatient.id} 
                             userRole={role || "doctor"} 

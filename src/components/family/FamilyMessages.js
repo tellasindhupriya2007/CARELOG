@@ -18,7 +18,12 @@ export default function FamilyMessages() {
         <div className="desktop-layout" style={{ backgroundColor: '#F8FAFC' }}>
             <Sidebar navItems={familySidebarItems} />
             <div className="desktop-content" style={{ display: 'flex', overflow: 'hidden', height: '100vh' }}>
-                <ChatInterface currentUser={user} patientId={patientId} userRole="family" />
+                <ChatInterface 
+                    key={patientId}
+                    currentUser={user} 
+                    patientId={patientId} 
+                    userRole="family" 
+                />
             </div>
         </div>
     );

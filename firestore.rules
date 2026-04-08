@@ -12,7 +12,24 @@ service cloud.firestore {
         resource.data.doctorId == request.auth.uid ||
         request.auth.uid in resource.data.caretakerIds);
       allow write: if request.auth != null &&
-        resource.data.familyId == request.auth.uid;
+        (resource.data.familyId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid);
+    }
+    
+    match /vitals/{vId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /careLogs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /clinicalNotes/{noteId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /media/{mId} {
+      allow read, write: if request.auth != null;
     }
     
     match /carePlans/{patientId} {
@@ -25,23 +42,19 @@ service cloud.firestore {
     }
     
     match /dailyLogs/{logId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
     
     match /alerts/{alertId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
     
     match /weeklyReports/{reportId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
     
     match /prescriptions/{prescriptionId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
   }
 }

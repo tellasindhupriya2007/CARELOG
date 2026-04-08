@@ -38,25 +38,35 @@ export const initSocket = ({ userId, role, name }) => {
     socket = io(SOCKET_URL, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 2000,
-        timeout: 10000,
+        reconnectionAttempts: Infinity, // Keep trying
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
         autoConnect: true,
     });
 
     socket._userId = userId;
 
     socket.on('connect', () => {
-        console.log('[Socket] Connected:', socket.id);
+        console.log('--- SOCKET CONNECTED ---');
+        console.log('[Socket] ID:', socket.id);
         socket.emit('join', { userId, role, name });
     });
 
     socket.on('connect_error', (err) => {
         console.warn('[Socket] Connection failed (Firestore fallback active):', err.message);
+        // Explicitly attempt reconnection if autoConnect didn't catch it
+        setTimeout(() => {
+            if (socket && !socket.connected) socket.connect();
+        }, 5000);
     });
 
     socket.on('disconnect', (reason) => {
         console.log('[Socket] Disconnected:', reason);
+        if (reason === 'io server disconnect') {
+            // the disconnection was initiated by the server, you need to reconnect manually
+            socket.connect();
+        }
     });
 
     return socket;

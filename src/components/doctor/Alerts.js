@@ -38,10 +38,10 @@ export default function DoctorAlerts() {
                 setAlerts(data);
                 setAlertCount(data.filter(a => !a.isRead && a.status !== 'resolved').length);
                 setLoading(false);
-            }, (err) => { setError('Failed to load alerts.'); setLoading(false); });
+            }, (err) => { setError('Failed to load diagnostics.'); setLoading(false); });
             return () => unsub();
         } catch (e) {
-            setError('Failed to load alerts.');
+            setError('Diagnostic stream error.');
             setLoading(false);
         }
     }, []);
@@ -63,43 +63,44 @@ export default function DoctorAlerts() {
 
     return (
         <DoctorShell alertCount={alertCount}>
-            <div style={{ flex: 1, overflowY: 'auto', backgroundColor: DS.surface, padding: '32px' }}>
-                <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+            <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#F8FAFC', padding: '40px' }}>
+                <div style={{ maxWidth: '900px', margin: '0 auto' }}>
 
                     {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
-                        <div>
-                            <h1 style={{ fontSize: '28px', fontWeight: '900', color: DS.textPrimary, margin: '0 0 6px 0', letterSpacing: '-0.6px' }}>Alerts</h1>
-                            <p style={{ fontSize: '14px', color: DS.textMuted, fontWeight: '500', margin: 0 }}>
-                                {criticalCount > 0 && <span style={{ color: DS.danger, fontWeight: '700' }}>{criticalCount} critical · </span>}
-                                {warningCount > 0 && <span style={{ color: DS.warning, fontWeight: '700' }}>{warningCount} warnings · </span>}
-                                {alerts.filter(a => a.status === 'resolved').length} resolved
-                            </p>
+                    <div style={{ marginBottom: '40px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                            <div style={{ width: '40px', height: '1px', backgroundColor: '#D92D20' }}></div>
+                            <span style={{ fontSize: '13px', fontWeight: '900', color: '#D92D20', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Clinical Severity Oversight</span>
                         </div>
+                        <h1 style={{ fontSize: '36px', fontWeight: '900', color: '#101828', margin: '0 0 12px 0', letterSpacing: '-1.5px' }}>Diagnostic Alerts</h1>
+                        <p style={{ fontSize: '16px', color: '#475467', fontWeight: '600' }}>
+                            {criticalCount > 0 ? <span style={{ color: '#D92D20' }}>{criticalCount} high-risk events detected </span> : 'System status optimal'}
+                        </p>
                     </div>
 
-                    {/* Stats Strip */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
+                    {/* Stats Pods */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '40px' }}>
                         {[
-                            { label: 'Active Alerts', value: alerts.filter(a => a.status !== 'resolved').length, color: DS.primaryContainer, bg: '#EEF2FF' },
-                            { label: 'Critical', value: criticalCount, color: DS.danger, bg: '#FEF2F2' },
-                            { label: 'Resolved', value: alerts.filter(a => a.status === 'resolved').length, color: DS.success, bg: '#DCFCE7' },
+                            { label: 'Active Alerts', value: alerts.filter(a => a.status !== 'resolved').length, color: '#0052FF', bg: '#EFF4FF' },
+                            { label: 'Critical Events', value: criticalCount, color: '#D92D20', bg: '#FFF1F0' },
+                            { label: 'Resolved Cases', value: alerts.filter(a => a.status === 'resolved').length, color: '#079455', bg: '#ECFDF5' },
                         ].map((s, i) => (
-                            <div key={i} style={{ backgroundColor: s.bg, borderRadius: '18px', padding: '18px 22px', boxShadow: '0 4px 16px rgba(25,28,30,0.04)' }}>
-                                <div style={{ fontSize: '32px', fontWeight: '900', color: s.color, letterSpacing: '-1px', lineHeight: 1 }}>{s.value}</div>
-                                <div style={{ fontSize: '11px', fontWeight: '700', color: DS.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '6px' }}>{s.label}</div>
+                            <div key={i} style={{ backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px 28px', border: '1px solid #EAECF0', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                                <div style={{ fontSize: '36px', fontWeight: '900', color: s.color, letterSpacing: '-1px', lineHeight: 1 }}>{s.value}</div>
+                                <div style={{ fontSize: '13px', fontWeight: '800', color: '#475467', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '12px' }}>{s.label}</div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', backgroundColor: DS.surfaceLowest, borderRadius: '14px', padding: '4px' }}>
+                    {/* Elite Tab System */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', backgroundColor: '#F2F4F7', borderRadius: '20px', padding: '6px' }}>
                         {SEVERITY_TABS.map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                                flex: 1, padding: '10px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                                fontSize: '13px', fontWeight: '700', transition: 'all 0.2s',
-                                backgroundColor: activeTab === tab ? DS.primaryContainer : 'transparent',
-                                color: activeTab === tab ? 'white' : DS.textSecondary,
+                                flex: 1, padding: '12px 16px', borderRadius: '16px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                                fontSize: '14px', fontWeight: '800', transition: 'all 0.2s',
+                                backgroundColor: activeTab === tab ? '#ffffff' : 'transparent',
+                                color: activeTab === tab ? '#101828' : '#475467',
+                                boxShadow: activeTab === tab ? '0 4px 12px rgba(16, 24, 40, 0.08)' : 'none'
                             }}>
                                 {tab}
                             </button>
@@ -108,20 +109,20 @@ export default function DoctorAlerts() {
 
                     {/* Error */}
                     {error && (
-                        <div style={{ backgroundColor: '#FEF2F2', borderRadius: '14px', padding: '16px 20px', color: DS.danger, fontWeight: '700', marginBottom: '16px' }}>
-                            ⚠ {error}
+                        <div style={{ backgroundColor: '#FEF3F2', borderRadius: '16px', padding: '16px 24px', color: '#B42318', fontWeight: '700', marginBottom: '24px', border: '1px solid #FEE4E2' }}>
+                            ⚠ Diagnostic Error: {error}
                         </div>
                     )}
 
-                    {/* Alert List */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {loading && [1, 2, 3, 4].map(i => <Skeleton key={i} height="88px" />)}
+                    {/* Diagnostic Slot List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {loading && [1, 2, 3, 4].map(i => <Skeleton key={i} height="100px" borderRadius="16px" />)}
 
                         {!loading && filtered.length === 0 && (
-                            <div style={{ textAlign: 'center', padding: '60px 20px', color: DS.textMuted }}>
-                                <CheckCircle size={44} color={DS.success} style={{ display: 'block', margin: '0 auto 16px' }} />
-                                <div style={{ fontSize: '16px', fontWeight: '800', color: DS.textPrimary, marginBottom: '6px' }}>All clear!</div>
-                                <div style={{ fontSize: '14px', fontWeight: '500' }}>No {activeTab !== 'All' ? activeTab.toLowerCase() : ''} alerts at this time.</div>
+                            <div style={{ textAlign: 'center', padding: '80px 40px', backgroundColor: '#ffffff', borderRadius: '32px', border: '1px dashed #EAECF0' }}>
+                                <CheckCircle size={56} color="#079455" strokeWidth={1.5} style={{ display: 'block', margin: '0 auto 24px', opacity: 0.8 }} />
+                                <div style={{ fontSize: '20px', fontWeight: '900', color: '#101828', marginBottom: '8px' }}>Operational Integrity Verified</div>
+                                <div style={{ fontSize: '15px', fontWeight: '600', color: '#475467' }}>No {activeTab !== 'All' ? activeTab.toLowerCase() : ''} diagnostic alerts requiring clinical intervention.</div>
                             </div>
                         )}
 
@@ -141,9 +142,9 @@ function AlertCard({ alert, onResolve, onViewPatient }) {
     const isCritical = alert.severity === 'critical';
     const isWarning = alert.severity === 'warning';
 
-    const severityColor = isCritical ? DS.danger : isWarning ? DS.warning : DS.success;
-    const severityBg = isCritical ? '#FEF2F2' : isWarning ? '#FEF3C7' : '#DCFCE7';
-    const severityLabel = isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'NORMAL';
+    const severityColor = isCritical ? '#D92D20' : isWarning ? '#DC6803' : '#079455';
+    const severityBg = isCritical ? '#FEF3F2' : isWarning ? '#FFFAEB' : '#ECFDF5';
+    const severityLabel = isCritical ? 'CRITICAL RISK' : isWarning ? 'WARNING' : 'STABLE';
 
     const timeAgo = (ts) => {
         if (!ts) return 'Unknown';
@@ -157,53 +158,53 @@ function AlertCard({ alert, onResolve, onViewPatient }) {
 
     return (
         <div style={{
-            backgroundColor: DS.surfaceLowest, borderRadius: '18px', padding: '18px 20px',
-            boxShadow: isCritical && !isResolved ? '0 4px 20px rgba(239,68,68,0.1)' : '0 4px 16px rgba(25,28,30,0.04)',
-            border: isCritical && !isResolved ? '1px solid rgba(239,68,68,0.2)' : '1px solid transparent',
-            opacity: isResolved ? 0.65 : 1,
-            transition: 'all 0.2s',
+            backgroundColor: '#ffffff', borderRadius: '24px', padding: '24px 32px',
+            boxShadow: isCritical && !isResolved ? '0 12px 32px -8px rgba(217, 45, 32, 0.15)' : '0 4px 12px rgba(16, 24, 40, 0.02)',
+            border: isCritical && !isResolved ? '1px solid #FEE4E2' : '1px solid #EAECF0',
+            opacity: isResolved ? 0.6 : 1,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '14px', flex: 1 }}>
-                    {/* Icon */}
-                    <div style={{ width: '44px', height: '44px', borderRadius: '14px', backgroundColor: severityBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {isCritical ? <AlertTriangle size={22} color={severityColor} /> : isWarning ? <Bell size={22} color={severityColor} /> : <CheckCircle size={22} color={severityColor} />}
+            <div style={{ display: 'flex', gap: '24px', flex: 1, alignItems: 'center' }}>
+                {/* Status Indicator */}
+                <div style={{ width: '56px', height: '56px', borderRadius: '18px', backgroundColor: severityBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `1px solid ${severityColor}20` }}>
+                    {isCritical ? <AlertTriangle size={28} color={severityColor} /> : isWarning ? <Bell size={28} color={severityColor} /> : <CheckCircle size={28} color={severityColor} />}
+                </div>
+                
+                <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '18px', fontWeight: '900', color: '#101828' }}>{alert.patientName || 'Clinical Case'}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px', color: severityColor, backgroundColor: severityBg, padding: '4px 10px', borderRadius: '8px', border: `1px solid ${severityColor}20` }}>
+                            {isResolved ? 'RESOLVED ARCHIVE' : severityLabel}
+                        </span>
                     </div>
-                    <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '15px', fontWeight: '800', color: DS.textPrimary }}>{alert.patientName || 'Patient'}</span>
-                            <span style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px', color: severityColor, backgroundColor: severityBg, padding: '3px 8px', borderRadius: '6px' }}>
-                                {isResolved ? 'RESOLVED' : severityLabel}
+                    <p style={{ fontSize: '15px', color: '#475467', fontWeight: '600', margin: '0 0 10px 0', lineHeight: 1.6 }}>{alert.message}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#667085', fontWeight: '700' }}>
+                            <Clock size={14} color="#98A2B3" /> {timeAgo(alert.timestamp)}
+                        </span>
+                        {alert.source && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#667085', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                <User size={14} color="#98A2B3" /> SOURCE: {alert.source}
                             </span>
-                        </div>
-                        <p style={{ fontSize: '14px', color: DS.textSecondary, fontWeight: '600', margin: '0 0 8px 0', lineHeight: 1.5 }}>{alert.message}</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: DS.textMuted, fontWeight: '600' }}>
-                                <Clock size={11} /> {timeAgo(alert.timestamp)}
-                            </span>
-                            {alert.source && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: DS.textMuted, fontWeight: '600', textTransform: 'capitalize' }}>
-                                    <User size={11} /> Source: {alert.source}
-                                </span>
-                            )}
-                        </div>
+                        )}
                     </div>
                 </div>
-
-                {/* Actions */}
-                {!isResolved && (
-                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                        {alert.patientId && (
-                            <button onClick={() => onViewPatient(alert.patientId)} title="View Patient" style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', backgroundColor: '#EEF2FF', color: DS.primaryContainer, fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'inherit' }}>
-                                <ExternalLink size={13} /> Patient
-                            </button>
-                        )}
-                        <button onClick={() => onResolve(alert.id)} title="Mark Resolved" style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', backgroundColor: '#DCFCE7', color: DS.success, fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'inherit' }}>
-                            <CheckCircle size={13} /> Resolve
-                        </button>
-                    </div>
-                )}
             </div>
+
+            {/* Actions */}
+            {!isResolved && (
+                <div style={{ display: 'flex', gap: '12px', paddingLeft: '32px' }}>
+                    {alert.patientId && (
+                        <button onClick={() => onViewPatient(alert.patientId)} style={{ height: '44px', padding: '0 20px', borderRadius: '14px', border: '1px solid #EAECF0', backgroundColor: '#ffffff', color: '#0052FF', fontSize: '13px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 1px 2px rgba(16, 24, 40, 0.05)' }}>
+                            <ExternalLink size={16} /> Patient Profile
+                        </button>
+                    )}
+                    <button onClick={() => onResolve(alert.id)} style={{ height: '44px', padding: '0 20px', borderRadius: '14px', border: 'none', backgroundColor: '#079455', color: '#ffffff', fontSize: '13px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(7, 148, 85, 0.2)' }}>
+                        <CheckCircle size={16} /> Resolve
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
 import { colors } from '../../styles/colors';
 import { typography } from '../../styles/typography';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft, LogOut, Menu } from 'lucide-react';
 
 const roleColors = {
     family: { bg: '#EFF6FF', color: '#2D6BE4' },
@@ -11,7 +11,7 @@ const roleColors = {
     doctor: { bg: '#FFF7ED', color: '#EA580C' },
 };
 
-export default function TopHeader({ title, subtitle, showBack, onBack, rightIcon }) {
+export default function TopHeader({ title, subtitle, showBack, onBack, rightIcon, onMenu, showMenuButton }) {
     const { user, role, photoURL, logout } = useAuthContext();
     const navigate = useNavigate();
     const [showMenu, setShowMenu] = useState(false);
@@ -121,6 +121,19 @@ export default function TopHeader({ title, subtitle, showBack, onBack, rightIcon
                         }}
                     >
                         <ArrowLeft color={colors.textPrimary} size={24} />
+                    </button>
+                )}
+                {showMenuButton && !showBack && (
+                    <button
+                        onClick={onMenu}
+                        className="mobile-only"
+                        style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            height: '44px', width: '44px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'flex-start'
+                        }}
+                    >
+                        <Menu color={colors.textPrimary} size={24} />
                     </button>
                 )}
             </div>

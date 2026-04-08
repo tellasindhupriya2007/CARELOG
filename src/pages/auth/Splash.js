@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
 import { colors } from '../../styles/colors';
-import { Home, User, Stethoscope, ArrowRight, HeartPulse, Activity } from 'lucide-react';
+import { Home, User, Stethoscope, ArrowRight, Activity } from 'lucide-react';
+import logo from '../../assets/logo.png';
 
 export default function Splash() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function Splash() {
     <div style={{
         minHeight: '100vh',
         width: '100vw',
-        background: 'linear-gradient(140deg, #F0F9FF 0%, #E0E7FF 50%, #F3E8FF 100%)',
+        background: 'linear-gradient(to bottom right, #f8fafc, #eef2ff)',
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
@@ -38,43 +39,45 @@ export default function Splash() {
       {/* Decorative Orbs */}
       <div className="orb orb-1"></div>
       <div className="orb orb-2"></div>
-      <div className="orb orb-3"></div>
 
       <div className="glass-card" style={{
           position: 'relative',
           zIndex: 10,
-          background: 'rgba(255, 255, 255, 0.75)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
-          borderRadius: '32px',
-          padding: '48px',
-          width: '100%',
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+          borderRadius: '24px',
+          padding: '48px 40px',
+          width: '90%',
           maxWidth: '460px',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.06), 0 0 0 1px rgba(255,255,255,0.2) inset',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.01)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center'
       }}>
           
-        {/* Animated Brand Logo */}
-        <div style={{ position: 'relative', marginBottom: '32px' }}>
-            <div className="logo-glow"></div>
-            <div style={{
-                width: '72px', height: '72px', background: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
-                borderRadius: '22px', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                boxShadow: '0 10px 20px rgba(37, 99, 235, 0.25)', position: 'relative', zIndex: 2
-            }}>
-                <HeartPulse size={36} color="#FFFFFF" strokeWidth={2.5} className="pulse-icon" />
-            </div>
+        {/* Professional Logo */}
+        <div style={{ position: 'relative', marginBottom: '24px' }}>
+            <img 
+                src={logo} 
+                alt="CareLog Logo" 
+                style={{ 
+                    width: '140px', 
+                    height: 'auto', 
+                    objectFit: 'contain',
+                    display: 'block',
+                    mixBlendMode: 'multiply'
+                }} 
+            />
         </div>
 
-        <h1 style={{ fontSize: '36px', fontWeight: '900', color: '#0F172A', letterSpacing: '-1px', marginBottom: '12px' }}>CareLog</h1>
-        <p style={{ fontSize: '15px', color: '#64748B', marginBottom: '40px', textAlign: 'center', fontWeight: '500', lineHeight: '1.5' }}>
-            Next-generation healthcare ecosystem.<br/>Choose your operational role to continue.
+        <h1 style={{ fontSize: '32px', fontWeight: '600', color: '#0F172A', letterSpacing: '-0.5px', marginBottom: '8px' }}>CareLog</h1>
+        <p style={{ fontSize: '15px', color: '#64748B', marginBottom: '40px', textAlign: 'center', fontWeight: '400', lineHeight: '1.6' }}>
+            Unified healthcare ecosystem for families.<br/>Select your role to begin.
         </p>
 
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {roles.map((r) => (
                 <button
                     key={r.id}
@@ -84,37 +87,37 @@ export default function Splash() {
                     style={{
                         width: '100%',
                         padding: '16px 20px',
-                        background: hovered === r.id ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)',
-                        border: `1px solid ${hovered === r.id ? r.color + '40' : 'rgba(255,255,255,0.6)'}`,
-                        borderRadius: '20px',
+                        background: hovered === r.id ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
+                        border: `1px solid ${hovered === r.id ? '#E2E8F0' : 'rgba(0, 0, 0, 0.04)'}`,
+                        borderRadius: '16px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '16px',
                         cursor: 'pointer',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: hovered === r.id ? `0 12px 24px ${r.color}15, 0 4px 8px rgba(0,0,0,0.02)` : 'none',
-                        transform: hovered === r.id ? 'translateY(-2px)' : 'none'
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: hovered === r.id ? '0 12px 24px rgba(0,0,0,0.04)' : 'none',
+                        transform: hovered === r.id ? 'translateX(0) translateY(-1px)' : 'none'
                     }}
                 >
                     <div style={{
-                        width: '48px', height: '48px', backgroundColor: r.bg, color: r.color,
-                        borderRadius: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                        transition: 'transform 0.3s', transform: hovered === r.id ? 'scale(1.1)' : 'scale(1)'
+                        width: '44px', height: '44px', backgroundColor: r.bg, color: r.color,
+                        borderRadius: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        transition: 'transform 0.2s', transform: hovered === r.id ? 'scale(1.05)' : 'scale(1)'
                     }}>
-                        <r.icon size={22} strokeWidth={2.5} />
+                        <r.icon size={20} strokeWidth={2} />
                     </div>
                     
-                    <div style={{ flex: 1, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '16px', fontWeight: '800', color: '#1E293B' }}>{r.title}</span>
-                        <span style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>{r.desc}</span>
+                    <div style={{ flex: 1, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '15px', fontWeight: '600', color: '#1E293B' }}>{r.title}</span>
+                        <span style={{ fontSize: '13px', color: '#94A3B8' }}>{r.desc}</span>
                     </div>
 
                     <ArrowRight 
-                        size={20} 
+                        size={18} 
                         color={hovered === r.id ? r.color : '#CBD5E1'} 
                         style={{ 
                             transform: hovered === r.id ? 'translateX(4px)' : 'translateX(0)',
-                            transition: 'all 0.3s',
+                            transition: 'all 0.2s',
                             opacity: hovered === r.id ? 1 : 0.5
                         }} 
                     />
@@ -125,32 +128,30 @@ export default function Splash() {
       </div>
 
       <style>{`
-        .orb { position: absolute; border-radius: 50%; filter: blur(80px); z-index: 1; animation: float 20s infinite ease-in-out alternate; }
-        .orb-1 { width: 400px; height: 400px; background: rgba(56, 189, 248, 0.3); top: -10%; left: -10%; animation-delay: 0s; }
-        .orb-2 { width: 500px; height: 500px; background: rgba(167, 139, 250, 0.25); bottom: -20%; right: -10%; animation-delay: -5s; }
-        .orb-3 { width: 300px; height: 300px; background: rgba(16, 185, 129, 0.2); top: 40%; left: 60%; animation-delay: -10s; }
+        .orb { position: absolute; border-radius: 50%; filter: blur(100px); z-index: 1; opacity: 0.5; }
+        .orb-1 { width: 400px; height: 400px; background: rgba(59, 130, 246, 0.2); top: -10%; left: -5%; }
+        .orb-2 { width: 500px; height: 500px; background: rgba(99, 102, 241, 0.1); bottom: -10%; right: -5%; }
         
         .logo-glow {
             position: absolute; width: 100%; height: 100%;
-            background: linear-gradient(135deg, #2563EB, #8B5CF6);
-            filter: blur(20px); opacity: 0.5; border-radius: 20px;
+            background: radial-gradient(circle, rgba(59,130,246,0.2), transparent);
+            filter: blur(25px); opacity: 0.6; border-radius: 50%;
             animation: pulse-glow 3s infinite alternate;
         }
 
-        .pulse-icon { animation: heartbeat 2s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+        .pulse-icon { animation: heartbeat 2s infinite ease-in-out; }
 
-        @keyframes float { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(50px, 50px) scale(1.1); } }
-        @keyframes pulse-glow { 0% { opacity: 0.3; transform: scale(1); } 100% { opacity: 0.6; transform: scale(1.1); } }
-        @keyframes heartbeat { 0%, 100% { transform: scale(1); } 10% { transform: scale(1.1); } 20% { transform: scale(1); } 30% { transform: scale(1.1); } 40% { transform: scale(1); } }
+        @keyframes pulse-glow { 0% { opacity: 0.4; transform: scale(1); } 100% { opacity: 0.8; transform: scale(1.2); } }
+        @keyframes heartbeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 
         @media (max-width: 480px) {
             .glass-card {
-                padding: 32px 24px !important;
-                border-radius: 24px !important;
-                border-bottom-left-radius: 0 !important;
-                border-bottom-right-radius: 0 !important;
-                min-height: 85vh;
-                margin-top: auto;
+                padding: 40px 24px !important;
+                width: 100% !important;
+                border-radius: 28px 28px 0 0 !important;
+                position: fixed;
+                bottom: 0;
+                transform: translateY(0);
             }
         }
       `}</style>

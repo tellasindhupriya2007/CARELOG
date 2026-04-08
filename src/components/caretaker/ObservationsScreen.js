@@ -285,6 +285,19 @@ export default function ObservationsScreen() {
             const todayString = getTodayDateString();
             const logRef = await getDayLogRef(todayString);
             
+            // IF IMAGE EXISTS: Save to Clinical Media Hub for the Doctor
+            if (selectedImage) {
+                try {
+                    // Convert DataURL to Blob for upload
+                    const res = await fetch(selectedImage);
+                    const blob = await res.blob();
+                    const file = new File([blob], `observation_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    await uploadPatientMedia(patientId, file, imageDescription || 'Daily Observation Photo', user.uid);
+                } catch (e) {
+                    console.error("Clinical media upload failed:", e);
+                }
+            }
+
             const newObservation = {
                 mood: mood || null,
                 hasVoice: !!audioBlob,

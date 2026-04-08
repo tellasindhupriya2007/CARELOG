@@ -1,24 +1,24 @@
 export const spacing = {
-    pagePadding: '16px',
-    cardPadding: '16px',
-    gapBetweenCards: '12px',
-    gapBetweenSections: '24px',
+    pagePadding: '24px',
+    cardPadding: '24px',
+    gapBetweenCards: '16px',
+    gapBetweenSections: '32px',
     bottomNavHeight: '64px',
-    topHeaderHeight: '56px',
+    topHeaderHeight: '60px',
 
-    // Supplementary from doc 8: Border Radius
+    // Premium Border Radius
     borderRadius: {
-        card: '16px',
+        card: '18px',
         button: '12px',
-        input: '10px',
-        badge: '8px',
+        input: '12px',
+        badge: '999px',
         bottomNav: '0px',
     },
 
-    // Supplementary from doc 8: Shadows
+    // Premium Shadows
     shadows: {
-        card: '0px 2px 8px rgba(0,0,0,0.08)',
-        button: '0px 4px 12px rgba(45,107,228,0.3)',
+        card: '0 8px 30px rgba(0, 0, 0, 0.04)',
+        button: '0 6px 16px rgba(37, 99, 235, 0.1)',
         none: 'none',
     }
 };

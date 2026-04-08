@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, limit, query
 import { auth, db } from '../firebase/config';
 import { colors } from '../styles/colors';
 import { typography } from '../styles/typography';
+import logo from '../assets/logo.png';
 
 export const AuthContext = createContext();
 
@@ -178,39 +179,91 @@ export const AuthProvider = ({ children }) => {
     if (loading) {
         return (
             <div style={{
-                backgroundColor: colors.white,
+                backgroundColor: '#F8FAFC',
+                background: 'linear-gradient(to bottom right, #f8fafc, #eef2ff)',
                 height: '100vh',
                 width: '100%',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                zIndex: 9999
             }}>
                 <div style={{
-                    fontSize: '32px',
-                    fontWeight: typography.pageTitle.fontWeight,
-                    fontFamily: typography.fontFamily,
-                    color: colors.primaryBlue,
-                    marginBottom: '16px'
+                    position: 'relative',
+                    marginBottom: '32px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center'
                 }}>
-                    CareLog
+                    <img 
+                        src={logo} 
+                        alt="CareLog Logo" 
+                        style={{ 
+                            width: '120px', 
+                            height: 'auto', 
+                            objectFit: 'contain', 
+                            animation: 'pulse-scale 2s infinite ease-in-out',
+                            mixBlendMode: 'multiply'
+                        }} 
+                    />
+                    <div style={{
+                        marginTop: '24px',
+                        fontSize: '28px',
+                        fontWeight: '700',
+                        color: '#0F172A',
+                        letterSpacing: '-1px'
+                    }}>
+                        CareLog
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <div className="dot" style={{ animationDelay: '0s' }} />
-                    <div className="dot" style={{ animationDelay: '0.2s' }} />
-                    <div className="dot" style={{ animationDelay: '0.4s' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                    <div className="loader-container">
+                        <div className="loader-bar"></div>
+                    </div>
+                    <p style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '500', 
+                        color: '#64748B',
+                        animation: 'fade-in-out 2s infinite'
+                    }}>
+                        Setting up your workspace...
+                    </p>
                 </div>
+
                 <style>{`
-                    .dot {
-                        width: 12px;
-                        height: 12px;
-                        background-color: ${colors.primaryBlue};
-                        border-radius: 50%;
-                        animation: bounce 1.4s infinite ease-in-out both;
+                    @keyframes pulse-scale {
+                        0%, 100% { transform: scale(1); }
+                        50% { transform: scale(1.05); }
                     }
-                    @keyframes bounce {
-                        0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
-                        40% { transform: scale(1); opacity: 1; }
+                    @keyframes fade-in-out {
+                        0%, 100% { opacity: 0.6; }
+                        50% { opacity: 1; }
+                    }
+                    .loader-container {
+                        width: 140px;
+                        height: 4px;
+                        background: rgba(37, 99, 235, 0.1);
+                        border-radius: 99px;
+                        overflow: hidden;
+                        position: relative;
+                    }
+                    .loader-bar {
+                        width: 40%;
+                        height: 100%;
+                        background: #2563EB;
+                        border-radius: 99px;
+                        position: absolute;
+                        left: -40%;
+                        animation: loading-shimmer 1.5s infinite ease-in-out;
+                    }
+                    @keyframes loading-shimmer {
+                        0% { left: -40%; }
+                        100% { left: 100%; }
                     }
                 `}</style>
             </div>

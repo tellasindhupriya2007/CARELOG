@@ -33,15 +33,16 @@ export const createShiftHandover = async (patientId, caregiverId, caregiverName)
         completedAt: completions[t.id]?.completedAt || null
     }));
 
-    // 2. Fetch Latest Vitals (limit 1)
-    const vitalsQ = query(collection(db, 'vitals'), where('patientId', '==', patientId), limit(10));
+    // 2. Fetch Latest Vitals (Bypass index with client-side sort)
+    const vitalsQ = query(collection(db, 'vitals'), where('patientId', '==', patientId));
     const vitalsSnap = await getDocs(vitalsQ);
+    console.log("Vitals fetched for handover");
     let latestVitals = null;
     if (!vitalsSnap.empty) {
-        // Sort client side to avoid index issue
+        // Precise sorting handles Firestore Timestamp objects correctly
         const sortedVitals = vitalsSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
-            const ta = a.timestamp?.toDate?.() || new Date(a.timestamp || 0);
-            const tb = b.timestamp?.toDate?.() || new Date(b.timestamp || 0);
+            const ta = a.recordedAt?.toMillis ? a.recordedAt.toMillis() : (a.recordedAt?.toDate ? a.recordedAt.toDate().getTime() : (a.recordedAt || 0));
+            const tb = b.recordedAt?.toMillis ? b.recordedAt.toMillis() : (b.recordedAt?.toDate ? b.recordedAt.toDate().getTime() : (b.recordedAt || 0));
             return tb - ta;
         });
         latestVitals = sortedVitals[0] || null;

@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
 import { getLatestHandover, createShiftHandover } from '../../services/handoverService';
-import { getDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getDoc, doc, updateDoc, serverTimestamp, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { subscribeToTasks, subscribeToDailyLogs } from '../../services/taskService';
+import { listenToAlerts } from '../../services/alertService';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import PrimaryButton from '../common/PrimaryButton';
 import Card from '../common/Card';
@@ -23,6 +25,12 @@ export default function ShiftHandover() {
     const [caregiverName, setCaregiverName] = useState('Caregiver');
     const [toastMessage, setToastMessage] = useState(null);
     const [handoverSubmitted, setHandoverSubmitted] = useState(false);
+    
+    // Live Data for current shift
+    const [liveTasks, setLiveTasks] = useState([]);
+    const [liveVitals, setLiveVitals] = useState(null);
+    const [liveAlerts, setLiveAlerts] = useState([]);
+    const [liveCompletions, setLiveCompletions] = useState({});
 
     const checkSubmitted = (data) => {
         if (!data || !data.createdAt) return false;
@@ -46,6 +54,32 @@ export default function ShiftHandover() {
             setLoading(false);
         };
         init();
+
+        if (patientId) {
+            const unsubTasks = subscribeToTasks(patientId, setLiveTasks);
+            const unsubLogs = subscribeToDailyLogs(patientId, setLiveCompletions);
+            const unsubAlerts = listenToAlerts(patientId, setLiveAlerts);
+            
+            const qVitals = query(collection(db, 'vitals'), where('patientId', '==', patientId));
+            const unsubVitals = onSnapshot(qVitals, (snap) => {
+                if (!snap.empty) {
+                    const sorted = snap.docs.map(d => ({ ...d.data(), id: d.id }))
+                        .sort((a,b) => {
+                            const ta = a.recordedAt?.toMillis?.() || Date.now();
+                            const tb = b.recordedAt?.toMillis?.() || Date.now();
+                            return tb - ta;
+                        });
+                    setLiveVitals(sorted[0]);
+                }
+            });
+
+            return () => {
+                unsubTasks();
+                unsubLogs();
+                unsubAlerts();
+                unsubVitals();
+            };
+        }
     }, [user, patientId]);
 
     const handleRecordHandover = async () => {
@@ -83,6 +117,24 @@ export default function ShiftHandover() {
         }
         setRecording(false);
     };
+
+    // Current Shift derived data
+    const currentTasks = liveTasks.map(t => ({
+        ...t,
+        status: liveCompletions[t.id]?.completed ? 'completed' : 'pending'
+    }));
+    
+    const liveCompletedCount = currentTasks.filter(t => t.status === 'completed').length;
+    const livePendingCount = currentTasks.filter(t => t.status === 'pending').length;
+    const liveHasCritical = liveAlerts.some(a => a.type === 'critical');
+
+    // UI Data: Prefer submitted snapshot if submitted, otherwise LIVE data
+    const displayTasks = (handoverSubmitted && snapshot) ? snapshot.tasks : currentTasks;
+    const displayVitals = (handoverSubmitted && snapshot) ? snapshot.vitals : liveVitals;
+    const displayAlerts = (handoverSubmitted && snapshot) ? snapshot.alerts : liveAlerts;
+    const displayCompleted = (handoverSubmitted && snapshot) ? (snapshot.tasks?.filter(t=>t.status==='completed').length || 0) : liveCompletedCount;
+    const displayPending = (handoverSubmitted && snapshot) ? (snapshot.tasks?.filter(t=>t.status==='pending').length || 0) : livePendingCount;
+    const displayCritical = (handoverSubmitted && snapshot) ? (snapshot.alerts?.some(a=>a.type==='critical') || false) : liveHasCritical;
 
     if (loading) {
         return (
@@ -168,47 +220,50 @@ export default function ShiftHandover() {
                     <>
                         {/* Header Info */}
                         <div style={{ 
-                            backgroundColor: handoverSubmitted ? '#ECFDF5' : colors.white, 
-                            padding: '16px', borderRadius: '12px', border: `1px solid ${handoverSubmitted ? '#A7F3D0' : colors.border}`,
+                            backgroundColor: handoverSubmitted ? '#ECFDF5' : '#FEF9C3', 
+                            padding: '16px', borderRadius: '12px', border: `1px solid ${handoverSubmitted ? '#A7F3D0' : '#FEF3C7'}`,
                             display: 'flex', flexDirection: 'column', gap: '4px'
                         }}>
                             {handoverSubmitted ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669' }}>
                                     <CheckCircle2 size={16} />
                                     <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase' }}>
-                                        Current Shift Submitted
+                                        Validated Shift Snapshot
                                     </h3>
                                 </div>
                             ) : (
-                                <h3 style={{ fontSize: '13px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>
-                                    Previous Snapshot Info
-                                </h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#854D0E' }}>
+                                    <Clock size={16} />
+                                    <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase' }}>
+                                        Current Live Shift Status
+                                    </h3>
+                                </div>
                             )}
                             <p style={{ fontSize: '16px', fontWeight: '800', color: colors.textPrimary, marginTop: '4px' }}>
-                                {handoverSubmitted ? 'Submitted' : 'Previous Shift'} by {snapshot.caregiverName}
+                                {handoverSubmitted ? `Completed by ${snapshot.caregiverName}` : `Active Shift: ${caregiverName}`}
                             </p>
                             <p style={{ fontSize: '13px', color: colors.textSecondary, fontWeight: '600' }}>
-                                Recorded at: {new Date(snapshot.createdAt?.toDate?.() || snapshot.createdAt).toLocaleString()}
+                                {handoverSubmitted ? `Recorded at: ${new Date(snapshot.createdAt?.toDate?.() || snapshot.createdAt).toLocaleString()}` : 'Live data from current session'}
                             </p>
                         </div>
 
                         {/* SECTION 1: Summary */}
-                        <Card style={{ padding: '20px' }}>
-                            <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary, marginBottom: '16px' }}>Handover Summary</h3>
+                        <Card style={{ padding: '20px', border: !handoverSubmitted ? `1px solid #FEF3C7` : `1px solid ${colors.border}` }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary, marginBottom: '16px' }}>Shift Overview</h3>
                             <div style={{ display: 'flex', gap: '12px' }}>
-                                <div style={{ flex: 1, backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '28px', fontWeight: '900', color: '#059669' }}>{completedCount}</span>
+                                <div style={{ flex: 1, backgroundColor: '#ECFDF5', padding: '16px', borderRadius: '12px', border: '1px solid #D1FAE5', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '28px', fontWeight: '900', color: '#059669' }}>{displayCompleted}</span>
                                     <span style={{ fontSize: '11px', fontWeight: '800', color: '#059669', textTransform: 'uppercase' }}>Completed Tasks</span>
                                 </div>
                                 <div style={{ flex: 1, backgroundColor: '#FEF2F2', padding: '16px', borderRadius: '12px', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '28px', fontWeight: '900', color: '#DC2626' }}>{pendingCount}</span>
+                                    <span style={{ fontSize: '28px', fontWeight: '900', color: '#DC2626' }}>{displayPending}</span>
                                     <span style={{ fontSize: '11px', fontWeight: '800', color: '#DC2626', textTransform: 'uppercase' }}>Pending Tasks</span>
                                 </div>
                             </div>
-                            {hasCriticalAlerts && (
+                            {displayCritical && (
                                 <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#FEF2F2', borderRadius: '8px', border: '1px solid #FECACA', display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <AlertTriangle size={18} color="#DC2626" />
-                                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626' }}>Critical alerts were reported during this shift.</span>
+                                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626' }}>Critical alerts detected in this shift.</span>
                                 </div>
                             )}
                         </Card>
@@ -220,10 +275,11 @@ export default function ShiftHandover() {
                                 <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Tasks Snapshot</h3>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {snapshot.tasks?.length > 0 ? snapshot.tasks.map((t, idx) => (
+                                {displayTasks?.length > 0 ? displayTasks.map((t, idx) => (
                                     <div key={idx} style={{ 
                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', 
-                                        backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` 
+                                        backgroundColor: t.status === 'completed' ? '#F0FDF4' : '#F8FAFC', 
+                                        borderRadius: '8px', border: `1px solid ${t.status === 'completed' ? '#BBF7D0' : colors.border}` 
                                     }}>
                                         <div>
                                             <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>{t.title}</div>
@@ -231,9 +287,9 @@ export default function ShiftHandover() {
                                         </div>
                                         <div>
                                             {t.status === 'completed' ? (
-                                                <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', backgroundColor: '#ECFDF5', color: '#059669', borderRadius: '999px' }}>COMPLETED</span>
+                                                <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', backgroundColor: '#DCFCE7', color: '#166534', borderRadius: '999px' }}>COMPLETED</span>
                                             ) : (
-                                                <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', backgroundColor: '#FEF2F2', color: '#DC2626', borderRadius: '999px' }}>PENDING</span>
+                                                <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', backgroundColor: '#FEF2F2', color: '#991B1B', borderRadius: '999px' }}>PENDING</span>
                                             )}
                                         </div>
                                     </div>
@@ -247,25 +303,27 @@ export default function ShiftHandover() {
                         <Card style={{ padding: '20px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                                 <HeartPulse size={20} color={colors.primaryBlue} />
-                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Latest Vitals Snapshot</h3>
+                                <h3 style={{ fontSize: '16px', fontWeight: '900', color: colors.textPrimary }}>Latest Readings</h3>
                             </div>
-                            {snapshot.vitals ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>Heart Rate</div>
-                                        <div style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>{snapshot.vitals.heartRate} <span style={{ fontSize: '12px', fontWeight: '600' }}>bpm</span></div>
+                            {displayVitals ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: '4px' }}>Heart Rate</div>
+                                        <div style={{ fontSize: '20px', fontWeight: '900', color: colors.textPrimary }}>{displayVitals.heartRate} <span style={{ fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>bpm</span></div>
                                     </div>
-                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>Blood Pressure</div>
-                                        <div style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>{snapshot.vitals.bpSystolic}/{snapshot.vitals.bpDiastolic}</div>
+                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: '4px' }}>Blood Pressure</div>
+                                        <div style={{ fontSize: '20px', fontWeight: '900', color: colors.textPrimary }}>{displayVitals.bp?.systolic || displayVitals.bpSystolic}/{displayVitals.bp?.diastolic || displayVitals.bpDiastolic} <span style={{ fontSize: '12px', fontWeight: '600', color: colors.textSecondary }}>mmHg</span></div>
                                     </div>
-                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' }}>Temperature</div>
-                                        <div style={{ fontSize: '18px', fontWeight: '900', color: colors.textPrimary }}>{snapshot.vitals.temperature}°C</div>
+                                    <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: '4px' }}>Temperature</div>
+                                        <div style={{ fontSize: '20px', fontWeight: '900', color: colors.textPrimary }}>{displayVitals.temperature}°C</div>
                                     </div>
                                 </div>
                             ) : (
-                                <p style={{ fontSize: '13px', color: colors.textSecondary }}>No vitals recorded.</p>
+                                <div style={{ padding: '24px', textAlign: 'center', backgroundColor: '#F8FAFC', borderRadius: '12px', border: `1px dashed ${colors.border}` }}>
+                                    <p style={{ fontSize: '13px', color: colors.textSecondary, margin: 0 }}>No vital signs recorded for this shift.</p>
+                                </div>
                             )}
                         </Card>
 

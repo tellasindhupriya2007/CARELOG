@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft, LogOut, Menu } from 'lucide-react';
 import { colors } from '../../styles/colors';
 
 const roleColors = {
@@ -10,7 +10,7 @@ const roleColors = {
     doctor: { bg: '#FFF7ED', color: '#EA580C' },
 };
 
-export default function ScreenHeader({ title, showBack, rightIcon, onBack }) {
+export default function ScreenHeader({ title, showBack, rightIcon, onBack, onMenu, showMenuButton }) {
     const navigate = useNavigate();
     const { user, role, photoURL, logout } = useAuthContext();
     const [showMenu, setShowMenu] = useState(false);
@@ -145,6 +145,25 @@ export default function ScreenHeader({ title, showBack, rightIcon, onBack }) {
                         }}
                     >
                         <ArrowLeft size={20} strokeWidth={2.5} />
+                    </button>
+                )}
+                {showMenuButton && !showBack && (
+                    <button 
+                        onClick={onMenu}
+                        className="mobile-only"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '8px',
+                            margin: '-8px',
+                            color: colors.textPrimary
+                        }}
+                    >
+                        <Menu size={20} strokeWidth={2.5} />
                     </button>
                 )}
             </div>

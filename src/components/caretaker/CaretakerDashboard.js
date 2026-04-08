@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { 
+    collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, 
+    onSnapshot, orderBy, limit, addDoc, serverTimestamp 
+} from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getTodayDateString, formatDisplayDate } from '../../utils/dateHelpers';
 import ScreenHeader from '../../components/common/ScreenHeader';
@@ -18,8 +21,10 @@ import { spacing } from '../../styles/spacing';
 import { typography } from '../../styles/typography';
 import { 
     Bell, CheckCircle2, Clock, Plus, X, Pill, Heart, Smile, Activity, ShieldCheck,
-    Calendar, ChevronRight, TrendingUp, Utensils, HeartPulse, Mic, User, Check 
+    Calendar, ChevronRight, TrendingUp, Utensils, HeartPulse, Mic, User, Check,
+    AlertTriangle, ShieldAlert, CheckCircle
 } from 'lucide-react';
+import axios from 'axios';
 import { subscribeToTasks, subscribeToDailyLogs, toggleTaskCompletion } from '../../services/taskService';
 import { listenToAlerts } from '../../services/alertService';
 import CaretakerSidePanel from './CaretakerSidePanel';
@@ -27,6 +32,7 @@ import CaretakerSidePanel from './CaretakerSidePanel';
 export default function CaretakerDashboard() {
     const navigate = useNavigate();
     const { user, patientId, setPatientId } = useAuthContext();
+    const [isSidebarOpen, setSidebarOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
@@ -44,6 +50,8 @@ export default function CaretakerDashboard() {
     const [linkIdInput, setLinkIdInput] = useState('');
     const [linkError, setLinkError] = useState('');
     const [linking, setLinking] = useState(false);
+
+    const [latestVitals, setLatestVitals] = useState(null);
 
     const pressTimer = useRef(null);
 
@@ -75,6 +83,7 @@ export default function CaretakerDashboard() {
         };
         if (user) initUser();
     }, [user, patientId, setPatientId]);
+
 
     // Fetch human-readable Patient ID for pill badge
     useEffect(() => {
@@ -151,10 +160,26 @@ export default function CaretakerDashboard() {
             setAlertCount(unreadCount);
         });
 
+        const qVitals = query(collection(db, 'vitals'), where('patientId', '==', patientId));
+        const unsubVitals = onSnapshot(qVitals, (snap) => {
+            console.log("Vitals fetched for dashboard");
+            if (!snap.empty) {
+                const sorted = snap.docs
+                    .map(d => ({ ...d.data(), id: d.id }))
+                    .sort((a, b) => {
+                        const ta = a.recordedAt?.toMillis?.() || new Date(a.recordedAt || 0).getTime();
+                        const tb = b.recordedAt?.toMillis?.() || new Date(b.recordedAt || 0).getTime();
+                        return tb - ta;
+                    });
+                setLatestVitals(sorted[0]);
+            }
+        });
+
         return () => {
             unsubTasks();
             unsubLogs();
             unsubAlerts();
+            unsubVitals();
             clearTimeout(dashboardTimeout);
         };
     }, [patientId]);
@@ -298,11 +323,18 @@ export default function CaretakerDashboard() {
 
     return (
         <div className="desktop-layout" style={{ backgroundColor: colors.background, minHeight: '100vh', display: 'flex', flexDirection: 'row', position: 'relative' }}>
-            <Sidebar navItems={sidebarItems} />
+            <div className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
+            <Sidebar 
+                navItems={sidebarItems} 
+                isOpen={isSidebarOpen} 
+                onClose={() => setSidebarOpen(false)} 
+            />
             <div className="desktop-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0 }}>
                 
                 <ScreenHeader
                     title={`Good Morning, ${firstName}`}
+                    showMenuButton={true}
+                    onMenu={() => setSidebarOpen(true)}
                     rightIcon={
                         <div style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => navigate('/caretaker/alerts')}>
                             <Bell size={20} color={colors.textPrimary} />
@@ -331,7 +363,7 @@ export default function CaretakerDashboard() {
                 <div 
                     className="main-content scroll-y" 
                     style={{ 
-                        padding: 'calc(var(--header-h) + 24px + env(safe-area-inset-top)) 20px 100px 20px', 
+                        padding: '24px 20px 100px 20px', 
                         flex: 1, 
                         overflowY: 'auto' 
                     }}
@@ -366,10 +398,11 @@ export default function CaretakerDashboard() {
                                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' 
                                 }}>
                                     <div>
-                                        <h1 style={{ fontSize: '28px', fontWeight: '900', color: colors.textPrimary, letterSpacing: '-0.5px', marginBottom: '4px' }}>{loading ? "..." : patientInfo.name}</h1>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <span style={{ fontSize: '12px', fontWeight: '800', color: colors.primaryBlue, backgroundColor: colors.lightBlue, padding: '4px 10px', borderRadius: '6px' }}>{humanPatientId}</span>
-                                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#991B1B', textTransform: 'uppercase' }}>Allergies: {patientInfo.allergies}</span>
+                                        <h1 style={{ fontSize: '22px', fontWeight: '900', color: colors.textPrimary, letterSpacing: '-0.3px', marginBottom: '8px' }}>{loading ? "..." : patientInfo.name}</h1>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: '800', color: colors.primaryBlue, backgroundColor: colors.lightBlue, padding: '3px 8px', borderRadius: '6px' }}>{humanPatientId}</span>
+                                            <span style={{ fontSize: '11px', fontWeight: '800', color: colors.primaryGreen, backgroundColor: colors.lightGreen, padding: '3px 8px', borderRadius: '6px' }}>STABLE</span>
+                                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#B91C1C', textTransform: 'uppercase', marginLeft: '4px' }}>Allergies: {patientInfo.allergies || 'NONE'}</span>
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
@@ -380,9 +413,10 @@ export default function CaretakerDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Progress & Summary Section */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
-                                    <Card style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '20px', backgroundColor: '#F0F9FF', border: 'none', height: '100%' }}>
+
+                                {/* Progress & Summary Section (Using summary-grid to prevent overlap) */}
+                                <div className="summary-grid">
+                                    <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '20px', backgroundColor: '#F0F9FF', border: 'none', marginBottom: 0 }}>
                                         <div style={{ position: 'relative', width: '64px', height: '64px' }}>
                                             <svg width="64" height="64" viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
                                                 <circle cx="40" cy="40" r="32" fill="transparent" stroke="#E2E8F0" strokeWidth="6" />
@@ -402,14 +436,14 @@ export default function CaretakerDashboard() {
                                             <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0369A1', marginBottom: '2px' }}>Day Completion</h4>
                                             <p style={{ fontSize: '12px', color: '#0C4A6E', opacity: 0.8 }}>{completedCount} of {totalCount} tasks verified</p>
                                         </div>
-                                    </Card>
+                                    </div>
 
-                                    <Card style={{ padding: '20px', height: '100%', backgroundColor: colors.white }}>
+                                    <div className="card" style={{ padding: '20px', backgroundColor: colors.white, marginBottom: 0 }}>
                                         <h4 style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Latest Handover</h4>
                                         <p style={{ fontSize: '13px', color: colors.textPrimary, fontStyle: 'italic', lineHeight: '1.5', opacity: 0.8 }}>
                                             "{loading ? "..." : (patientInfo.lastShiftSummary ? patientInfo.lastShiftSummary.substring(0, 100) : "No handover yet")}"
                                         </p>
-                                    </Card>
+                                    </div>
                                 </div>
 
                                 {/* Main Task List */}
@@ -433,9 +467,8 @@ export default function CaretakerDashboard() {
                                         )}
                                     </div>
                                 </div>
-                                
-                                {/* Quick Access Actions Grid */}
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                                {/* Quick Access Actions Grid (Using action-grid to prevent overlap) */}
+                                <div className="action-grid">
                                     {/* Shift Status */}
                                 <div style={{ backgroundColor: '#ECFDF5', padding: '20px', borderRadius: '16px', border: '1.5px solid #A7F3D0' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
@@ -467,11 +500,15 @@ export default function CaretakerDashboard() {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                         <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '10px', textAlign: 'center' }}>
                                             <p style={{ fontSize: '10px', fontWeight: '800', color: colors.textSecondary, marginBottom: '4px' }}>BP</p>
-                                            <p style={{ fontSize: '15px', fontWeight: '900', color: colors.textPrimary }}>120/80</p>
+                                            <p style={{ fontSize: '15px', fontWeight: '900', color: colors.textPrimary }}>
+                                                {latestVitals ? `${latestVitals.bp?.systolic}/${latestVitals.bp?.diastolic}` : '--/--'}
+                                            </p>
                                         </div>
                                         <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '10px', textAlign: 'center' }}>
                                             <p style={{ fontSize: '10px', fontWeight: '800', color: colors.textSecondary, marginBottom: '4px' }}>HR</p>
-                                            <p style={{ fontSize: '15px', fontWeight: '900', color: colors.textPrimary }}>72 bpm</p>
+                                            <p style={{ fontSize: '15px', fontWeight: '900', color: colors.textPrimary }}>
+                                                {latestVitals ? `${latestVitals.heartRate} bpm` : '-- bpm'}
+                                            </p>
                                         </div>
                                     </div>
                                 </Card>

@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -12,16 +12,18 @@ const firebaseConfig = {
     appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
+console.log('--- ENV LOADED ---');
+['REACT_APP_FIREBASE_API_KEY'].forEach(key => {
+    if (!process.env[key]) console.error(`[CRITICAL] Missing Required Variable: ${key}`);
+    else console.log(`[OK] ${key} is present`);
+});
+
+
+// Safe initialization guard
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+console.log('--- FIREBASE OK ---');
 
 export const auth = getAuth(app);
-
-// Firestore — NO offline persistence (prevents IndexedDB errors in Safari,
-// multiple tabs, and private browsing). The app uses real-time onSnapshot
-// listeners which work perfectly without local caching.
 export const db = getFirestore(app);
-
 export const storage = getStorage(app);
-
-// FCM — not used in this version
 export const messaging = null;

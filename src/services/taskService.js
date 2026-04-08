@@ -60,7 +60,7 @@ export const subscribeToTasks = (patientId, callback) => {
         where('active', '==', true)
     );
     return onSnapshot(q, (snapshot) => {
-        const tasks = snapshot.docs.map(doc => doc.data());
+        const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         callback(tasks);
     });
 };

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
 import { colors } from '../../styles/colors';
 import { spacing } from '../../styles/spacing';
+import logo from '../../assets/logo.png';
 
 const roleConfig = {
     family: { label: 'Family Member', bg: '#EFF6FF', color: '#2D6BE4' },
@@ -64,101 +65,139 @@ export default function RoleConfirmScreen() {
     };
 
     return (
-        <div className="auth-desktop-container" style={{ backgroundColor: colors.background, minHeight: '100vh' }}>
-            <div className="auth-desktop-card" style={{ backgroundColor: colors.white, minHeight: '100vh', padding: spacing.pagePadding, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '32px' }}>
+        <div className="auth-desktop-container" style={{ 
+            background: 'linear-gradient(to bottom right, #f8fafc, #eef2ff)',
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        }}>
+            <div className="auth-desktop-card" style={{ 
+                backgroundColor: '#ffffff', 
+                padding: '48px 40px', 
+                borderRadius: '24px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                border: '1px solid rgba(0,0,0,0.03)',
+                width: '90%',
+                maxWidth: '440px',
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center'
+            }}>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
 
-                    {/* Logo */}
-                    <div style={{ textAlign: 'center' }}>
-                        <h1 style={{ fontSize: '28px', fontWeight: '700', color: colors.primaryBlue, marginBottom: '6px' }}>CareLog</h1>
-                        <p style={{ fontSize: '14px', color: colors.textSecondary }}>Caring made simple</p>
+                    {/* Logo & Brand */}
+                    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <img 
+                            src={logo} 
+                            alt="CareLog Logo" 
+                            style={{ 
+                                width: '120px', 
+                                height: 'auto', 
+                                objectFit: 'contain', 
+                                marginBottom: '16px',
+                                mixBlendMode: 'multiply'
+                            }} 
+                        />
+                        <h1 style={{ fontSize: '32px', fontWeight: '600', color: '#0F172A', letterSpacing: '-0.5px', marginBottom: '8px' }}>CareLog</h1>
+                        <p style={{ fontSize: '15px', color: '#64748B' }}>Caring made simple</p>
                     </div>
 
                     {/* Role Badge */}
                     <div style={{
-                        backgroundColor: config.bg,
-                        color: config.color,
-                        padding: '8px 20px',
-                        borderRadius: '24px',
-                        fontSize: '14px',
+                        backgroundColor: '#DCFCE7',
+                        color: '#166534',
+                        padding: '6px 14px',
+                        borderRadius: '999px',
+                        fontSize: '13px',
                         fontWeight: '600',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '8px',
+                        border: '1px solid rgba(22, 101, 52, 0.1)'
                     }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: config.color, display: 'inline-block' }} />
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#166534', display: 'inline-block' }} />
                         {config.label}
                     </div>
 
                     {/* Google Sign In Button */}
-                    <div style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <button
                             onClick={handleGoogleSignIn}
                             disabled={loading}
+                            className="primary-login-btn"
                             style={{
                                 width: '100%',
-                                height: '52px',
-                                backgroundColor: colors.white,
-                                border: '1px solid #E5E7EB',
+                                minHeight: '52px',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #E2E8F0',
                                 borderRadius: '12px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '12px',
                                 cursor: loading ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.2s',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                                 opacity: loading ? 0.7 : 1,
                             }}
                         >
                             {loading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{
-                                        width: '20px', height: '20px', border: '2.5px solid #E5E7EB',
-                                        borderTop: `2.5px solid ${colors.primaryBlue}`, borderRadius: '50%',
-                                        animation: 'spin 0.8s linear infinite'
-                                    }} />
-                                    <span style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A2E' }}>Signing in…</span>
+                                    <div className="btn-spinner" />
+                                    <span style={{ fontSize: '15px', fontWeight: '600', color: '#1E293B' }}>Signing in…</span>
                                 </div>
                             ) : (
                                 <>
-                                    {/* Google "G" logo inline SVG */}
                                     <svg width="20" height="20" viewBox="0 0 48 48">
                                         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
                                         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
                                         <path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.9 23.9 0 000 24c0 3.77.9 7.34 2.44 10.53l8.09-5.94z" />
                                         <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                                        <path fill="none" d="M0 0h48v48H0z" />
                                     </svg>
-                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#1A1A2E' }}>Continue with Google</span>
+                                    <span style={{ fontSize: '15px', fontWeight: '600', color: '#1E293B' }}>Continue with Google</span>
                                 </>
                             )}
                         </button>
 
                         {error && (
                             <div style={{
-                                backgroundColor: '#FEF2F2', padding: '12px 16px', borderRadius: '10px',
-                                border: `1px solid ${colors.alertRed}`, textAlign: 'center'
+                                backgroundColor: '#FEF2F2', padding: '12px', borderRadius: '10px',
+                                border: '1px solid #FEE2E2', textAlign: 'center'
                             }}>
-                                <span style={{ fontSize: '13px', color: colors.alertRed, fontWeight: '500' }}>{error}</span>
+                                <span style={{ fontSize: '13px', color: '#991B1B', fontWeight: '500' }}>{error}</span>
                             </div>
                         )}
 
-                        <p style={{ fontSize: '12px', color: colors.textSecondary, textAlign: 'center', lineHeight: '1.5' }}>
-                            We will never post anything without your permission.
+                        <p style={{ fontSize: '13px', color: '#94A3B8', textAlign: 'center', lineHeight: '1.5' }}>
+                            Secure authentication powered by Google Cloud.
                         </p>
 
-                        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                            <p style={{ fontSize: '12px', fontWeight: '800', color: colors.textSecondary, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔧 Developer Sandbox</p>
+                        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', marginBottom: '24px' }}>
+                                <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+                                <span style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Developer Access</span>
+                                <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+                            </div>
                             <button
                                 onClick={handleDevSignIn}
                                 disabled={loading}
                                 style={{
-                                    width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0',
-                                    backgroundColor: '#F8FAFC', color: '#1E293B', fontWeight: '800', fontSize: '13px', cursor: 'pointer'
+                                    width: '100%', 
+                                    padding: '14px', 
+                                    borderRadius: '12px', 
+                                    border: '1px solid #E2E8F0',
+                                    backgroundColor: 'transparent', 
+                                    color: '#64748B', 
+                                    fontWeight: '600', 
+                                    fontSize: '14px', 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
                                 }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.color = '#1E293B'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#64748B'; }}
                             >
-                                CONTINUE AS DEV {selectedRole.toUpperCase()}
+                                Dev Sandbox Mode ({selectedRole})
                             </button>
                         </div>
                     </div>
@@ -166,15 +205,27 @@ export default function RoleConfirmScreen() {
                     {/* Back link */}
                     <button
                         onClick={() => navigate('/auth/splash')}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: colors.textSecondary, fontWeight: '500' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#64748B', fontWeight: '500', transition: 'color 0.2s' }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#2563EB'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
                     >
-                        ← Choose a different role
+                        ← Back to roles
                     </button>
                 </div>
 
                 <style>{`
-          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        `}</style>
+                    .primary-login-btn:hover {
+                        transform: translateY(-1px);
+                        box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+                        border-color: #CBD5E1;
+                    }
+                    .btn-spinner {
+                        width: 18px; height: 18px; border: 2px solid #E2E8F0;
+                        border-top: 2px solid #2563EB; borderRadius: 50%;
+                        animation: spin 0.8s linear infinite;
+                    }
+                    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                `}</style>
             </div>
         </div>
     );
