@@ -14,7 +14,7 @@ const roleConfig = {
 export default function RoleConfirmScreen() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { signInWithGoogle, devLogin } = useAuthContext();
+    const { signInWithGoogle } = useAuthContext();
 
     const selectedRole = location.state?.role || 'family';
     const config = roleConfig[selectedRole] || roleConfig.family;
@@ -31,20 +31,6 @@ export default function RoleConfirmScreen() {
         } catch (err) {
             console.error('Google Sign In Error:', err);
             setError('Sign in failed. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDevSignIn = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const { isNewUser, userRole, userPatientId } = await devLogin(selectedRole);
-            routeUser(isNewUser, userRole, userPatientId);
-        } catch (err) {
-            console.error('Dev Sign In Error:', err);
-            setError('Dev Mode failed.');
         } finally {
             setLoading(false);
         }
@@ -172,34 +158,6 @@ export default function RoleConfirmScreen() {
                         <p style={{ fontSize: '13px', color: '#94A3B8', textAlign: 'center', lineHeight: '1.5' }}>
                             Secure authentication powered by Google Cloud.
                         </p>
-
-                        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', marginBottom: '24px' }}>
-                                <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
-                                <span style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Developer Access</span>
-                                <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
-                            </div>
-                            <button
-                                onClick={handleDevSignIn}
-                                disabled={loading}
-                                style={{
-                                    width: '100%', 
-                                    padding: '14px', 
-                                    borderRadius: '12px', 
-                                    border: '1px solid #E2E8F0',
-                                    backgroundColor: 'transparent', 
-                                    color: '#64748B', 
-                                    fontWeight: '600', 
-                                    fontSize: '14px', 
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.color = '#1E293B'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#64748B'; }}
-                            >
-                                Dev Sandbox Mode ({selectedRole})
-                            </button>
-                        </div>
                     </div>
 
                     {/* Back link */}
